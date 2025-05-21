@@ -93,11 +93,15 @@ export class MemStorage implements IStorage {
     this.logs = new Map();
     this.settings = new Map();
     this.activities = new Map();
+    this.buildings = new Map();
+    this.rooms = new Map();
     
     this.nextAdapterId = 1;
     this.nextDeviceId = 1;
     this.nextLogId = 1;
     this.nextActivityId = 1;
+    this.nextBuildingId = 1;
+    this.nextRoomId = 1;
     
     // Initialize with default settings
     this.initializeDefaultSettings();
@@ -299,6 +303,107 @@ export class MemStorage implements IStorage {
   
   async deleteDevice(id: number): Promise<boolean> {
     return this.devices.delete(id);
+  }
+  
+  // Building methods
+  async getBuilding(id: number): Promise<Building | undefined> {
+    return this.buildings.get(id);
+  }
+  
+  async getAllBuildings(): Promise<Building[]> {
+    return Array.from(this.buildings.values());
+  }
+  
+  async insertBuilding(building: InsertBuilding): Promise<Building> {
+    const id = this.nextBuildingId++;
+    const now = new Date();
+    const newBuilding: Building = {
+      ...building,
+      id,
+      created_at: now,
+      updated_at: now
+    };
+    this.buildings.set(id, newBuilding);
+    return newBuilding;
+  }
+  
+  async updateBuilding(id: number, building: Partial<Building>): Promise<Building | undefined> {
+    const existingBuilding = this.buildings.get(id);
+    if (!existingBuilding) {
+      return undefined;
+    }
+    
+    const updatedBuilding: Building = {
+      ...existingBuilding,
+      ...building,
+      id: existingBuilding.id,
+      updated_at: new Date()
+    };
+    
+    this.buildings.set(id, updatedBuilding);
+    return updatedBuilding;
+  }
+  
+  async deleteBuilding(id: number): Promise<boolean> {
+    // Check if there are rooms assigned to this building
+    const hasRooms = Array.from(this.rooms.values()).some(room => room.building_id === id);
+    if (hasRooms) {
+      // Building has rooms, cannot delete
+      return false;
+    }
+    
+    return this.buildings.delete(id);
+  }
+  
+  // Room methods
+  async getRoom(id: number): Promise<Room | undefined> {
+    return this.rooms.get(id);
+  }
+  
+  async getRoomsByBuilding(buildingId: number): Promise<Room[]> {
+    return Array.from(this.rooms.values())
+      .filter(room => room.building_id === buildingId);
+  }
+  
+  async getAllRooms(): Promise<Room[]> {
+    return Array.from(this.rooms.values());
+  }
+  
+  async insertRoom(room: InsertRoom): Promise<Room> {
+    const id = this.nextRoomId++;
+    const now = new Date();
+    const newRoom: Room = {
+      ...room,
+      id,
+      created_at: now,
+      updated_at: now
+    };
+    this.rooms.set(id, newRoom);
+    return newRoom;
+  }
+  
+  async updateRoom(id: number, room: Partial<Room>): Promise<Room | undefined> {
+    const existingRoom = this.rooms.get(id);
+    if (!existingRoom) {
+      return undefined;
+    }
+    
+    const updatedRoom: Room = {
+      ...existingRoom,
+      ...room,
+      id: existingRoom.id,
+      updated_at: new Date()
+    };
+    
+    this.rooms.set(id, updatedRoom);
+    return updatedRoom;
+  }
+  
+  async deleteRoom(id: number): Promise<boolean> {
+    // Check if there are devices assigned to this room
+    // We would need to add a roomId field to devices for this
+    // For now just delete the room
+    return this.rooms.delete(id);
   }
   
   // Log methods

@@ -6,6 +6,7 @@ import deviceController from "./controllers/deviceController";
 import adapterController from "./controllers/adapterController";
 import settingsController from "./controllers/settingsController";
 import logController from "./controllers/logController";
+import locationController from "./controllers/locationController";
 import { AdapterManager } from "./adapters/AdapterManager";
 import { setupZigbeeAdapter } from "./adapters/zigbee";
 import { setupWifiAdapter } from "./adapters/wifi";
@@ -143,6 +144,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Activity routes
   app.get('/api/activities', deviceController.getActivities);
+  
+  // Building routes
+  app.get('/api/buildings', locationController.getAllBuildings);
+  app.get('/api/buildings/:id', locationController.getBuilding);
+  app.post('/api/buildings', locationController.addBuilding);
+  app.put('/api/buildings/:id', locationController.updateBuilding);
+  app.delete('/api/buildings/:id', locationController.deleteBuilding);
+  
+  // Room routes
+  app.get('/api/rooms', locationController.getAllRooms);
+  app.get('/api/rooms/:id', locationController.getRoom);
+  app.post('/api/rooms', locationController.addRoom);
+  app.put('/api/rooms/:id', locationController.updateRoom);
+  app.delete('/api/rooms/:id', locationController.deleteRoom);
 
   return httpServer;
 }
