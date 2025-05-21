@@ -90,10 +90,35 @@ export default function Settings() {
   useEffect(() => {
     if (settings && typeof settings === 'object') {
       const settingsObj = settings as Record<string, any>;
-      if (settingsObj.general) setGeneralSettings(settingsObj.general);
-      if (settingsObj.network) setNetworkSettings(settingsObj.network);
-      if (settingsObj.zigbee) setZigbeeSettings(settingsObj.zigbee);
-      if (settingsObj.wifi) setWifiSettings(settingsObj.wifi);
+      
+      // Only update settings if they actually have data
+      if (settingsObj.general && typeof settingsObj.general === 'object') {
+        const generalData = settingsObj.general.general || settingsObj.general;
+        if (Object.keys(generalData).length > 0) {
+          setGeneralSettings(prev => ({ ...prev, ...generalData }));
+        }
+      }
+      
+      if (settingsObj.network && typeof settingsObj.network === 'object') {
+        const networkData = settingsObj.network.network || settingsObj.network;
+        if (Object.keys(networkData).length > 0) {
+          setNetworkSettings(prev => ({ ...prev, ...networkData }));
+        }
+      }
+      
+      if (settingsObj.zigbee && typeof settingsObj.zigbee === 'object') {
+        const zigbeeData = settingsObj.zigbee.zigbee || settingsObj.zigbee;
+        if (Object.keys(zigbeeData).length > 0) {
+          setZigbeeSettings(prev => ({ ...prev, ...zigbeeData }));
+        }
+      }
+      
+      if (settingsObj.wifi && typeof settingsObj.wifi === 'object') {
+        const wifiData = settingsObj.wifi.wifi || settingsObj.wifi;
+        if (Object.keys(wifiData).length > 0) {
+          setWifiSettings(prev => ({ ...prev, ...wifiData }));
+        }
+      }
     }
   }, [settings]);
 
