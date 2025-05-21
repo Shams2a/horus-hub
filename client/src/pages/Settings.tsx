@@ -126,6 +126,13 @@ export default function Settings() {
           setWifiSettings(prev => ({ ...prev, ...wifiData }));
         }
       }
+      
+      if (settingsObj.database && typeof settingsObj.database === 'object') {
+        const databaseData = settingsObj.database.database || settingsObj.database;
+        if (Object.keys(databaseData).length > 0) {
+          setDatabaseSettings(prev => ({ ...prev, ...databaseData }));
+        }
+      }
     }
   }, [settings]);
 
@@ -188,6 +195,31 @@ export default function Settings() {
         title: 'Settings saved',
         description: 'WiFi settings have been updated successfully',
       });
+    } catch (error) {
+      toast({
+        title: 'Failed to save settings',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const handleSaveDatabase = async () => {
+    try {
+      await apiRequest('PUT', '/api/settings/database', databaseSettings);
+      
+      toast({
+        title: 'Settings saved',
+        description: 'Database settings have been updated successfully',
+      });
+      
+      // Si on active la synchronisation cloud, afficher un message supplémentaire
+      if (databaseSettings.useCloud) {
+        toast({
+          title: 'Cloud synchronization enabled',
+          description: `Data will be synchronized with the cloud database every ${databaseSettings.syncInterval} minutes`,
+        });
+      }
     } catch (error) {
       toast({
         title: 'Failed to save settings',
@@ -355,6 +387,7 @@ export default function Settings() {
           <TabsTrigger value="network">Network</TabsTrigger>
           <TabsTrigger value="zigbee">Zigbee</TabsTrigger>
           <TabsTrigger value="wifi">WiFi</TabsTrigger>
+          <TabsTrigger value="database">Database</TabsTrigger>
           <TabsTrigger value="backup">Backup & Restore</TabsTrigger>
         </TabsList>
         
@@ -497,6 +530,125 @@ export default function Settings() {
                 
                 <div className="mt-6 flex justify-end">
                   <Button type="submit" disabled={loadingSettings}>Save Settings</Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Database Settings Tab */}
+        <TabsContent value="database">
+          <Card className="mb-6">
+            <CardHeader className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <CardTitle className="text-md font-medium">Database Configuration</CardTitle>
+            </CardHeader>
+            <CardContent className="p-5">
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveDatabase();
+              }}>
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex items-center space-x-2 mb-4">
+                      <input
+                        type="checkbox"
+                        id="useCloud"
+                        checked={databaseSettings.useCloud}
+                        onChange={(e) => setDatabaseSettings({...databaseSettings, useCloud: e.target.checked})}
+                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <Label htmlFor="useCloud">Enable Cloud Database Synchronization</Label>
+                    </div>
+                    
+                    <p className="text-sm text-gray-500 mb-4">
+                      When enabled, the system will synchronize data with a cloud database for redundancy and remote access. 
+                      The local database will still be used as the primary storage in case of connectivity issues.
+                    </p>
+                  </div>
+                  
+                  {databaseSettings.useCloud && (
+                    <div className="space-y-4 p-4 border border-gray-200 dark:border-gray-700 rounded-md">
+                      <div>
+                        <Label htmlFor="cloudDatabaseUrl">Cloud Database URL</Label>
+                        <Input 
+                          id="cloudDatabaseUrl"
+                          placeholder="postgres://username:password@host:port/database"
+                          value={databaseSettings.cloudDatabaseUrl}
+                          onChange={(e) => setDatabaseSettings({...databaseSettings, cloudDatabaseUrl: e.target.value})}
+                        />
+                        <p className="text-sm text-gray-500 mt-1">The connection URL for your cloud PostgreSQL database</p>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="syncMode">Synchronization Mode</Label>
+                        <Select 
+                          value={databaseSettings.syncMode} 
+                          onValueChange={(value) => setDatabaseSettings({...databaseSettings, syncMode: value})}
+                        >
+                          <SelectTrigger id="syncMode">
+                            <SelectValue placeholder="Select sync mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="full">Full (Read & Write)</SelectItem>
+                            <SelectItem value="readonly">Read Only (Cloud to Local)</SelectItem>
+                            <SelectItem value="writeonly">Write Only (Local to Cloud)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-sm text-gray-500 mt-1">How data should be synchronized between local and cloud databases</p>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="syncInterval">Sync Interval (minutes)</Label>
+                        <Input 
+                          id="syncInterval"
+                          type="number"
+                          min="1"
+                          max="1440"
+                          value={databaseSettings.syncInterval}
+                          onChange={(e) => setDatabaseSettings({...databaseSettings, syncInterval: parseInt(e.target.value)})}
+                        />
+                        <p className="text-sm text-gray-500 mt-1">How often to synchronize data with the cloud database</p>
+                      </div>
+                      
+                      <div className="mt-4">
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              toast({
+                                title: 'Testing connection',
+                                description: 'Testing connection to cloud database...',
+                              });
+                              
+                              // Send a request to test the connection
+                              await apiRequest('POST', '/api/settings/database/test', {
+                                cloudDatabaseUrl: databaseSettings.cloudDatabaseUrl
+                              });
+                              
+                              toast({
+                                title: 'Connection successful',
+                                description: 'Successfully connected to the cloud database',
+                              });
+                            } catch (error) {
+                              toast({
+                                title: 'Connection failed',
+                                description: error instanceof Error ? error.message : 'Failed to connect to the cloud database',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                        >
+                          Test Connection
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-6 flex justify-end">
+                  <Button type="submit">
+                    Save Database Settings
+                  </Button>
                 </div>
               </form>
             </CardContent>
