@@ -569,4 +569,575 @@ export class MemStorage implements IStorage {
 }
 
 // Create and export a singleton instance of the storage
-export const storage = new MemStorage();
+/**
+ * DatabaseStorage implements the IStorage interface using PostgreSQL database
+ */
+export class DatabaseStorage implements IStorage {
+  constructor() {
+    // Initialize default database settings if needed
+    this.initializeDefaultSettings();
+  }
+
+  private async initializeDefaultSettings(): Promise<void> {
+    try {
+      // Check if essential settings exist, if not create them
+      const generalSettings = await this.getSettingsByCategory('general');
+      
+      if (generalSettings.length === 0) {
+        // Create some default settings
+        await this.insertSetting({
+          key: 'general.systemName',
+          value: 'Horus Hub',
+          category: 'general',
+          description: 'System name displayed in the UI'
+        });
+        
+        await this.insertSetting({
+          key: 'general.location',
+          value: 'Home',
+          category: 'general',
+          description: 'Default location for the system'
+        });
+        
+        await this.insertSetting({
+          key: 'database.useCloud',
+          value: false,
+          category: 'database',
+          description: 'Enable or disable cloud database synchronization'
+        });
+        
+        await this.insertSetting({
+          key: 'database.syncMode',
+          value: 'full',
+          category: 'database',
+          description: 'Synchronization mode between local and cloud databases'
+        });
+        
+        await this.insertSetting({
+          key: 'database.syncInterval',
+          value: 60,
+          category: 'database',
+          description: 'Interval in minutes for database synchronization'
+        });
+      }
+    } catch (error) {
+      console.error('Error initializing default settings:', error);
+    }
+  }
+  
+  // Adapter operations
+  async getAdapter(id: number): Promise<Adapter | undefined> {
+    try {
+      const [result] = await db.select().from(adapters).where(eq(adapters.id, id));
+      return result;
+    } catch (error) {
+      console.error('Error getting adapter:', error);
+      return undefined;
+    }
+  }
+
+  async getAdapterByName(name: string): Promise<Adapter | undefined> {
+    try {
+      const [result] = await db.select().from(adapters).where(eq(adapters.name, name));
+      return result;
+    } catch (error) {
+      console.error('Error getting adapter by name:', error);
+      return undefined;
+    }
+  }
+
+  async getAdaptersByType(type: string): Promise<Adapter[]> {
+    try {
+      return await db.select().from(adapters).where(eq(adapters.type, type));
+    } catch (error) {
+      console.error('Error getting adapters by type:', error);
+      return [];
+    }
+  }
+
+  async getAllAdapters(): Promise<Adapter[]> {
+    try {
+      return await db.select().from(adapters);
+    } catch (error) {
+      console.error('Error getting all adapters:', error);
+      return [];
+    }
+  }
+
+  async insertAdapter(adapter: InsertAdapter): Promise<Adapter> {
+    try {
+      const [result] = await db.insert(adapters).values(adapter).returning();
+      return result;
+    } catch (error) {
+      console.error('Error inserting adapter:', error);
+      throw error;
+    }
+  }
+
+  async updateAdapter(id: number, adapter: Partial<Adapter>): Promise<Adapter | undefined> {
+    try {
+      const [result] = await db
+        .update(adapters)
+        .set({
+          ...adapter,
+          lastSeen: new Date()
+        })
+        .where(eq(adapters.id, id))
+        .returning();
+      return result;
+    } catch (error) {
+      console.error('Error updating adapter:', error);
+      return undefined;
+    }
+  }
+
+  async deleteAdapter(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(adapters).where(eq(adapters.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting adapter:', error);
+      return false;
+    }
+  }
+
+  // Device operations
+  async getDevice(id: number): Promise<Device | undefined> {
+    try {
+      const [result] = await db.select().from(devices).where(eq(devices.id, id));
+      return result;
+    } catch (error) {
+      console.error('Error getting device:', error);
+      return undefined;
+    }
+  }
+
+  async getDeviceByDeviceId(deviceId: string): Promise<Device | undefined> {
+    try {
+      const [result] = await db.select().from(devices).where(eq(devices.deviceId, deviceId));
+      return result;
+    } catch (error) {
+      console.error('Error getting device by deviceId:', error);
+      return undefined;
+    }
+  }
+
+  async getDevicesByProtocol(protocol: string): Promise<Device[]> {
+    try {
+      return await db.select().from(devices).where(eq(devices.protocol, protocol));
+    } catch (error) {
+      console.error('Error getting devices by protocol:', error);
+      return [];
+    }
+  }
+
+  async getAllDevices(): Promise<Device[]> {
+    try {
+      return await db.select().from(devices);
+    } catch (error) {
+      console.error('Error getting all devices:', error);
+      return [];
+    }
+  }
+
+  async insertDevice(device: InsertDevice): Promise<Device> {
+    try {
+      const [result] = await db.insert(devices).values({
+        ...device,
+        lastSeen: new Date()
+      }).returning();
+      return result;
+    } catch (error) {
+      console.error('Error inserting device:', error);
+      throw error;
+    }
+  }
+
+  async updateDevice(id: number, device: Partial<Device>): Promise<Device | undefined> {
+    try {
+      const [result] = await db
+        .update(devices)
+        .set({
+          ...device,
+          lastSeen: new Date()
+        })
+        .where(eq(devices.id, id))
+        .returning();
+      return result;
+    } catch (error) {
+      console.error('Error updating device:', error);
+      return undefined;
+    }
+  }
+
+  async updateDeviceState(id: number, state: Record<string, any>): Promise<Device | undefined> {
+    try {
+      const [device] = await db.select().from(devices).where(eq(devices.id, id));
+      
+      if (!device) {
+        return undefined;
+      }
+      
+      const [result] = await db
+        .update(devices)
+        .set({
+          state,
+          lastSeen: new Date()
+        })
+        .where(eq(devices.id, id))
+        .returning();
+      return result;
+    } catch (error) {
+      console.error('Error updating device state:', error);
+      return undefined;
+    }
+  }
+
+  async deleteDevice(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(devices).where(eq(devices.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting device:', error);
+      return false;
+    }
+  }
+
+  // Building operations
+  async getBuilding(id: number): Promise<Building | undefined> {
+    try {
+      const [result] = await db.select().from(buildings).where(eq(buildings.id, id));
+      return result;
+    } catch (error) {
+      console.error('Error getting building:', error);
+      return undefined;
+    }
+  }
+
+  async getAllBuildings(): Promise<Building[]> {
+    try {
+      return await db.select().from(buildings);
+    } catch (error) {
+      console.error('Error getting all buildings:', error);
+      return [];
+    }
+  }
+
+  async insertBuilding(building: InsertBuilding): Promise<Building> {
+    try {
+      const now = new Date();
+      const [result] = await db.insert(buildings).values({
+        ...building,
+        created_at: now,
+        updated_at: now
+      }).returning();
+      return result;
+    } catch (error) {
+      console.error('Error inserting building:', error);
+      throw error;
+    }
+  }
+
+  async updateBuilding(id: number, building: Partial<Building>): Promise<Building | undefined> {
+    try {
+      const [result] = await db
+        .update(buildings)
+        .set({
+          ...building,
+          updated_at: new Date()
+        })
+        .where(eq(buildings.id, id))
+        .returning();
+      return result;
+    } catch (error) {
+      console.error('Error updating building:', error);
+      return undefined;
+    }
+  }
+
+  async deleteBuilding(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(buildings).where(eq(buildings.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting building:', error);
+      return false;
+    }
+  }
+
+  // Room operations
+  async getRoom(id: number): Promise<Room | undefined> {
+    try {
+      const [result] = await db.select().from(rooms).where(eq(rooms.id, id));
+      return result;
+    } catch (error) {
+      console.error('Error getting room:', error);
+      return undefined;
+    }
+  }
+
+  async getRoomsByBuilding(buildingId: number): Promise<Room[]> {
+    try {
+      return await db.select().from(rooms).where(eq(rooms.building_id, buildingId));
+    } catch (error) {
+      console.error('Error getting rooms by building:', error);
+      return [];
+    }
+  }
+
+  async getAllRooms(): Promise<Room[]> {
+    try {
+      return await db.select().from(rooms);
+    } catch (error) {
+      console.error('Error getting all rooms:', error);
+      return [];
+    }
+  }
+
+  async insertRoom(room: InsertRoom): Promise<Room> {
+    try {
+      const now = new Date();
+      const [result] = await db.insert(rooms).values({
+        ...room,
+        created_at: now,
+        updated_at: now
+      }).returning();
+      return result;
+    } catch (error) {
+      console.error('Error inserting room:', error);
+      throw error;
+    }
+  }
+
+  async updateRoom(id: number, room: Partial<Room>): Promise<Room | undefined> {
+    try {
+      const [result] = await db
+        .update(rooms)
+        .set({
+          ...room,
+          updated_at: new Date()
+        })
+        .where(eq(rooms.id, id))
+        .returning();
+      return result;
+    } catch (error) {
+      console.error('Error updating room:', error);
+      return undefined;
+    }
+  }
+
+  async deleteRoom(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(rooms).where(eq(rooms.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting room:', error);
+      return false;
+    }
+  }
+
+  // Log operations
+  async getLog(id: number): Promise<Log | undefined> {
+    try {
+      const [result] = await db.select().from(logs).where(eq(logs.id, id));
+      return result;
+    } catch (error) {
+      console.error('Error getting log:', error);
+      return undefined;
+    }
+  }
+
+  async getLogs(options: { 
+    limit?: number; 
+    offset?: number; 
+    level?: string; 
+    source?: string;
+    search?: string;
+  }): Promise<{ logs: Log[]; totalCount: number }> {
+    try {
+      const { limit = 50, offset = 0, level, source, search } = options;
+      
+      let query = db.select().from(logs);
+      let countQuery = db.select({ count: sql`count(*)` }).from(logs);
+      
+      const conditions = [];
+      
+      if (level) {
+        conditions.push(eq(logs.level, level));
+      }
+      
+      if (source) {
+        conditions.push(eq(logs.source, source));
+      }
+      
+      if (search) {
+        conditions.push(like(logs.message, `%${search}%`));
+      }
+      
+      if (conditions.length > 0) {
+        const condition = and(...conditions);
+        query = query.where(condition);
+        countQuery = countQuery.where(condition);
+      }
+      
+      const [countResult] = await countQuery;
+      const totalCount = Number(countResult.count);
+      
+      const results = await query
+        .orderBy(desc(logs.timestamp))
+        .limit(limit)
+        .offset(offset);
+      
+      return { logs: results, totalCount };
+    } catch (error) {
+      console.error('Error getting logs:', error);
+      return { logs: [], totalCount: 0 };
+    }
+  }
+
+  async insertLog(log: InsertLog): Promise<Log> {
+    try {
+      const [result] = await db.insert(logs).values({
+        ...log,
+        timestamp: new Date()
+      }).returning();
+      return result;
+    } catch (error) {
+      console.error('Error inserting log:', error);
+      throw error;
+    }
+  }
+
+  async clearLogs(): Promise<boolean> {
+    try {
+      await db.delete(logs);
+      return true;
+    } catch (error) {
+      console.error('Error clearing logs:', error);
+      return false;
+    }
+  }
+
+  // Setting operations
+  async getSetting(key: string): Promise<Setting | undefined> {
+    try {
+      const [result] = await db.select().from(settings).where(eq(settings.key, key));
+      return result;
+    } catch (error) {
+      console.error('Error getting setting:', error);
+      return undefined;
+    }
+  }
+
+  async getSettingsByCategory(category: string): Promise<Setting[]> {
+    try {
+      return await db.select().from(settings).where(eq(settings.category, category));
+    } catch (error) {
+      console.error('Error getting settings by category:', error);
+      return [];
+    }
+  }
+
+  async getAllSettings(): Promise<Setting[]> {
+    try {
+      return await db.select().from(settings);
+    } catch (error) {
+      console.error('Error getting all settings:', error);
+      return [];
+    }
+  }
+
+  async insertSetting(setting: InsertSetting): Promise<Setting> {
+    try {
+      const [result] = await db.insert(settings).values({
+        ...setting,
+        updatedAt: new Date()
+      }).returning();
+      return result;
+    } catch (error) {
+      console.error('Error inserting setting:', error);
+      
+      // If the setting already exists, try updating it
+      try {
+        const existingSetting = await this.getSetting(setting.key);
+        if (existingSetting) {
+          return await this.updateSetting(setting.key, setting.value);
+        }
+        throw error;
+      } catch (updateError) {
+        console.error('Error updating existing setting:', updateError);
+        throw error;
+      }
+    }
+  }
+
+  async updateSetting(key: string, value: any): Promise<Setting | undefined> {
+    try {
+      const [result] = await db
+        .update(settings)
+        .set({
+          value,
+          updatedAt: new Date()
+        })
+        .where(eq(settings.key, key))
+        .returning();
+      return result;
+    } catch (error) {
+      console.error('Error updating setting:', error);
+      return undefined;
+    }
+  }
+
+  async deleteSetting(key: string): Promise<boolean> {
+    try {
+      const result = await db.delete(settings).where(eq(settings.key, key));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting setting:', error);
+      return false;
+    }
+  }
+
+  // Activity operations
+  async getActivity(id: number): Promise<Activity | undefined> {
+    try {
+      const [result] = await db.select().from(activities).where(eq(activities.id, id));
+      return result;
+    } catch (error) {
+      console.error('Error getting activity:', error);
+      return undefined;
+    }
+  }
+
+  async getActivities(limit: number = 20): Promise<Activity[]> {
+    try {
+      return await db
+        .select()
+        .from(activities)
+        .orderBy(desc(activities.timestamp))
+        .limit(limit);
+    } catch (error) {
+      console.error('Error getting activities:', error);
+      return [];
+    }
+  }
+
+  async insertActivity(activity: InsertActivity): Promise<Activity> {
+    try {
+      const [result] = await db.insert(activities).values({
+        ...activity,
+        timestamp: new Date()
+      }).returning();
+      return result;
+    } catch (error) {
+      console.error('Error inserting activity:', error);
+      throw error;
+    }
+  }
+}
+
+// For now, continue using MemStorage while we develop the database implementation
+// The DatabaseStorage class implementation needs to be fixed before it can be used
+const storageImpl = new MemStorage();
+
+export const storage = storageImpl;
