@@ -8,7 +8,9 @@ import {
   Settings,
   X,
   Cloud,
-  HardDrive
+  HardDrive,
+  Map,
+  Building2
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 
@@ -78,7 +80,21 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
               }`}
             >
               <Tablet className="h-5 w-5 mr-3" />
-              <span>Tablet</span>
+              <span>Appareils</span>
+            </Link>
+          </li>
+          <li>
+            <Link 
+              href="/locations" 
+              onClick={closeSidebarOnMobile}
+              className={`flex items-center p-2 rounded-md transition-colors duration-200 ${
+                isActive('/locations') 
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground' 
+                  : 'text-sidebar-foreground hover:bg-sidebar-border'
+              }`}
+            >
+              <Building2 className="h-5 w-5 mr-3" />
+              <span>Emplacements</span>
             </Link>
           </li>
           <li>

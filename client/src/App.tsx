@@ -11,6 +11,7 @@ import Wifi from "./pages/Wifi";
 import Mqtt from "./pages/Mqtt";
 import Logs from "./pages/Logs";
 import Settings from "./pages/Settings";
+import Locations from "./pages/Locations";
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
@@ -28,6 +29,7 @@ function App() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/devices" component={Devices} />
+            <Route path="/locations" component={Locations} />
             <Route path="/zigbee" component={Zigbee} />
             <Route path="/wifi" component={Wifi} />
             <Route path="/mqtt" component={Mqtt} />
