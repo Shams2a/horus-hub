@@ -88,11 +88,12 @@ export default function Settings() {
 
   // Update local state when settings are loaded
   useEffect(() => {
-    if (settings) {
-      if (settings.general) setGeneralSettings(settings.general);
-      if (settings.network) setNetworkSettings(settings.network);
-      if (settings.zigbee) setZigbeeSettings(settings.zigbee);
-      if (settings.wifi) setWifiSettings(settings.wifi);
+    if (settings && typeof settings === 'object') {
+      const settingsObj = settings as Record<string, any>;
+      if (settingsObj.general) setGeneralSettings(settingsObj.general);
+      if (settingsObj.network) setNetworkSettings(settingsObj.network);
+      if (settingsObj.zigbee) setZigbeeSettings(settingsObj.zigbee);
+      if (settingsObj.wifi) setWifiSettings(settingsObj.wifi);
     }
   }, [settings]);
 
@@ -276,7 +277,7 @@ export default function Settings() {
     try {
       const result = await apiRequest('GET', '/api/system/check-updates', undefined);
       
-      if (result.available) {
+      if (result && typeof result === 'object' && 'available' in result && result.available) {
         toast({
           title: 'Update available',
           description: `Version ${result.version} is available. Click to install now.`,
@@ -796,25 +797,37 @@ export default function Settings() {
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Horus Hub Version:</span>
                   <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : systemInfo?.software?.version || '1.0.0'}
+                    {loadingSystemInfo ? 'Loading...' : 
+                      (systemInfo && typeof systemInfo === 'object' && 'software' in systemInfo && systemInfo.software?.version) 
+                      ? systemInfo.software.version 
+                      : '-'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Node.js Version:</span>
                   <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : systemInfo?.software?.nodeVersion || '16.14.2'}
+                    {loadingSystemInfo ? 'Loading...' : 
+                      (systemInfo && typeof systemInfo === 'object' && 'software' in systemInfo && systemInfo.software?.nodeVersion) 
+                      ? systemInfo.software.nodeVersion 
+                      : '-'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">OS:</span>
                   <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : systemInfo?.software?.os || 'Raspberry Pi OS 11 (Bullseye)'}
+                    {loadingSystemInfo ? 'Loading...' : 
+                      (systemInfo && typeof systemInfo === 'object' && 'software' in systemInfo && systemInfo.software?.os) 
+                      ? systemInfo.software.os 
+                      : '-'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Uptime:</span>
                   <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : systemInfo?.software?.uptime || '2 days, 5 hours'}
+                    {loadingSystemInfo ? 'Loading...' : 
+                      (systemInfo && typeof systemInfo === 'object' && 'software' in systemInfo && systemInfo.software?.uptime) 
+                      ? systemInfo.software.uptime 
+                      : '-'}
                   </span>
                 </div>
               </div>
@@ -833,25 +846,37 @@ export default function Settings() {
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Device:</span>
                   <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : systemInfo?.hardware?.device || 'Raspberry Pi 4 Model B'}
+                    {loadingSystemInfo ? 'Loading...' : 
+                      (systemInfo && typeof systemInfo === 'object' && 'hardware' in systemInfo && systemInfo.hardware?.device) 
+                      ? systemInfo.hardware.device 
+                      : '-'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">CPU Usage:</span>
                   <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : `${systemInfo?.hardware?.cpuUsage || 23}%`}
+                    {loadingSystemInfo ? 'Loading...' : 
+                      (systemInfo && typeof systemInfo === 'object' && 'hardware' in systemInfo && systemInfo.hardware?.cpuUsage !== undefined) 
+                      ? `${systemInfo.hardware.cpuUsage}%` 
+                      : '-'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Memory Usage:</span>
                   <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : systemInfo?.hardware?.memoryUsage || '512MB / 2GB'}
+                    {loadingSystemInfo ? 'Loading...' : 
+                      (systemInfo && typeof systemInfo === 'object' && 'hardware' in systemInfo && systemInfo.hardware?.memoryUsage) 
+                      ? systemInfo.hardware.memoryUsage 
+                      : '-'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Storage:</span>
                   <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : systemInfo?.hardware?.storageUsage || '4.2GB / 16GB'}
+                    {loadingSystemInfo ? 'Loading...' : 
+                      (systemInfo && typeof systemInfo === 'object' && 'hardware' in systemInfo && systemInfo.hardware?.storageUsage) 
+                      ? systemInfo.hardware.storageUsage 
+                      : '-'}
                   </span>
                 </div>
               </div>
@@ -876,7 +901,7 @@ export default function Settings() {
                         Loading adapter information...
                       </TableCell>
                     </TableRow>
-                  ) : systemInfo?.adapters ? (
+                  ) : (systemInfo && typeof systemInfo === 'object' && 'adapters' in systemInfo && Array.isArray(systemInfo.adapters)) ? (
                     systemInfo.adapters.map((adapter: any, index: number) => (
                       <TableRow key={index}>
                         <TableCell className="text-sm">{adapter.protocol}</TableCell>
