@@ -1,272 +1,268 @@
-import { Request, Response } from "express";
-import { storage } from "../storage";
-import logger from "../utils/logger";
-import { insertBuildingSchema, insertRoomSchema } from "@shared/schema";
+import { Request, Response } from 'express';
+import { storage } from '../storage';
+import { insertBuildingSchema, insertRoomSchema } from '@shared/schema';
+import logger from '../utils/logger';
 
 // Building controllers
-export const getAllBuildings = async (req: Request, res: Response) => {
+const getAllBuildings = async (req: Request, res: Response) => {
   try {
     const buildings = await storage.getAllBuildings();
     res.json(buildings);
   } catch (error) {
-    logger.error('Error getting buildings', { error });
-    res.status(500).json({ error: 'Failed to get buildings' });
+    logger.error('Error fetching buildings', { error });
+    res.status(500).json({ error: 'Failed to fetch buildings' });
   }
 };
 
-export const getBuilding = async (req: Request, res: Response) => {
+const getBuilding = async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid building ID' });
-    }
-    
     const building = await storage.getBuilding(id);
+    
     if (!building) {
       return res.status(404).json({ error: 'Building not found' });
     }
     
     res.json(building);
   } catch (error) {
-    logger.error('Error getting building', { error, id: req.params.id });
-    res.status(500).json({ error: 'Failed to get building' });
+    logger.error('Error fetching building', { error });
+    res.status(500).json({ error: 'Failed to fetch building' });
   }
 };
 
-export const addBuilding = async (req: Request, res: Response) => {
+const addBuilding = async (req: Request, res: Response) => {
   try {
-    const parseResult = insertBuildingSchema.safeParse(req.body);
-    if (!parseResult.success) {
-      return res.status(400).json({ error: 'Invalid building data', details: parseResult.error });
+    const result = insertBuildingSchema.safeParse(req.body);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: 'Invalid building data', details: result.error.errors });
     }
     
-    const building = await storage.insertBuilding(parseResult.data);
+    const newBuilding = await storage.insertBuilding(result.data);
     
     // Log activity
-    await storage.insertActivity({
+    const activityData = {
+      entityId: newBuilding.id,
       activity: 'building_added',
-      details: { buildingId: building.id, name: building.name }
-    });
+      details: {
+        name: newBuilding.name
+      },
+      timestamp: new Date()
+    };
+    await storage.insertActivity(activityData);
     
-    // Broadcast to connected clients
-    if (req.app.locals.broadcast) {
-      req.app.locals.broadcast('building_added', building);
-    }
-    
-    res.status(201).json(building);
+    res.status(201).json(newBuilding);
   } catch (error) {
-    logger.error('Error adding building', { error, data: req.body });
+    logger.error('Error adding building', { error });
     res.status(500).json({ error: 'Failed to add building' });
   }
 };
 
-export const updateBuilding = async (req: Request, res: Response) => {
+const updateBuilding = async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid building ID' });
+    const result = insertBuildingSchema.safeParse(req.body);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: 'Invalid building data', details: result.error.errors });
     }
     
-    const building = await storage.getBuilding(id);
-    if (!building) {
+    const updatedBuilding = await storage.updateBuilding(id, result.data);
+    
+    if (!updatedBuilding) {
       return res.status(404).json({ error: 'Building not found' });
     }
     
-    const updatedBuilding = await storage.updateBuilding(id, req.body);
-    
     // Log activity
-    await storage.insertActivity({
+    const activityData = {
+      entityId: updatedBuilding.id,
       activity: 'building_updated',
-      details: { buildingId: id, name: updatedBuilding?.name }
-    });
-    
-    // Broadcast to connected clients
-    if (req.app.locals.broadcast) {
-      req.app.locals.broadcast('building_updated', updatedBuilding);
-    }
+      details: {
+        name: updatedBuilding.name
+      },
+      timestamp: new Date()
+    };
+    await storage.insertActivity(activityData);
     
     res.json(updatedBuilding);
   } catch (error) {
-    logger.error('Error updating building', { error, id: req.params.id, data: req.body });
+    logger.error('Error updating building', { error });
     res.status(500).json({ error: 'Failed to update building' });
   }
 };
 
-export const deleteBuilding = async (req: Request, res: Response) => {
+const deleteBuilding = async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid building ID' });
+    
+    // First, check if there are any rooms in this building
+    const rooms = await storage.getRoomsByBuilding(id);
+    
+    if (rooms.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete building with rooms', 
+        message: 'Please delete all rooms in this building first' 
+      });
     }
     
-    const building = await storage.getBuilding(id);
-    if (!building) {
+    const success = await storage.deleteBuilding(id);
+    
+    if (!success) {
       return res.status(404).json({ error: 'Building not found' });
     }
     
-    const deleted = await storage.deleteBuilding(id);
-    if (!deleted) {
-      return res.status(400).json({ error: 'Cannot delete building with assigned rooms' });
-    }
-    
     // Log activity
-    await storage.insertActivity({
+    const activityData = {
+      entityId: id,
       activity: 'building_deleted',
-      details: { buildingId: id, name: building.name }
-    });
-    
-    // Broadcast to connected clients
-    if (req.app.locals.broadcast) {
-      req.app.locals.broadcast('building_deleted', { id });
-    }
+      details: {},
+      timestamp: new Date()
+    };
+    await storage.insertActivity(activityData);
     
     res.json({ success: true });
   } catch (error) {
-    logger.error('Error deleting building', { error, id: req.params.id });
+    logger.error('Error deleting building', { error });
     res.status(500).json({ error: 'Failed to delete building' });
   }
 };
 
 // Room controllers
-export const getAllRooms = async (req: Request, res: Response) => {
+const getAllRooms = async (req: Request, res: Response) => {
   try {
+    const buildingId = req.query.buildingId ? parseInt(req.query.buildingId as string) : undefined;
+    
     let rooms;
-    if (req.query.buildingId) {
-      const buildingId = parseInt(req.query.buildingId as string);
-      if (isNaN(buildingId)) {
-        return res.status(400).json({ error: 'Invalid building ID' });
-      }
+    if (buildingId) {
       rooms = await storage.getRoomsByBuilding(buildingId);
     } else {
       rooms = await storage.getAllRooms();
     }
+    
     res.json(rooms);
   } catch (error) {
-    logger.error('Error getting rooms', { error, query: req.query });
-    res.status(500).json({ error: 'Failed to get rooms' });
+    logger.error('Error fetching rooms', { error });
+    res.status(500).json({ error: 'Failed to fetch rooms' });
   }
 };
 
-export const getRoom = async (req: Request, res: Response) => {
+const getRoom = async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid room ID' });
-    }
-    
     const room = await storage.getRoom(id);
+    
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
     }
     
     res.json(room);
   } catch (error) {
-    logger.error('Error getting room', { error, id: req.params.id });
-    res.status(500).json({ error: 'Failed to get room' });
+    logger.error('Error fetching room', { error });
+    res.status(500).json({ error: 'Failed to fetch room' });
   }
 };
 
-export const addRoom = async (req: Request, res: Response) => {
+const addRoom = async (req: Request, res: Response) => {
   try {
-    const parseResult = insertRoomSchema.safeParse(req.body);
-    if (!parseResult.success) {
-      return res.status(400).json({ error: 'Invalid room data', details: parseResult.error });
+    const result = insertRoomSchema.safeParse(req.body);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: 'Invalid room data', details: result.error.errors });
     }
     
-    // Check if building exists
-    const building = await storage.getBuilding(parseResult.data.building_id);
+    // Verify that the building exists
+    const building = await storage.getBuilding(result.data.building_id);
     if (!building) {
-      return res.status(400).json({ error: 'Building not found' });
+      return res.status(404).json({ error: 'Building not found' });
     }
     
-    const room = await storage.insertRoom(parseResult.data);
+    const newRoom = await storage.insertRoom(result.data);
     
     // Log activity
-    await storage.insertActivity({
+    const activityData = {
+      entityId: newRoom.id,
       activity: 'room_added',
-      details: { roomId: room.id, name: room.name, buildingId: room.building_id }
-    });
+      details: {
+        name: newRoom.name,
+        building: building.name
+      },
+      timestamp: new Date()
+    };
+    await storage.insertActivity(activityData);
     
-    // Broadcast to connected clients
-    if (req.app.locals.broadcast) {
-      req.app.locals.broadcast('room_added', room);
-    }
-    
-    res.status(201).json(room);
+    res.status(201).json(newRoom);
   } catch (error) {
-    logger.error('Error adding room', { error, data: req.body });
+    logger.error('Error adding room', { error });
     res.status(500).json({ error: 'Failed to add room' });
   }
 };
 
-export const updateRoom = async (req: Request, res: Response) => {
+const updateRoom = async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid room ID' });
+    const result = insertRoomSchema.safeParse(req.body);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: 'Invalid room data', details: result.error.errors });
     }
     
-    const room = await storage.getRoom(id);
-    if (!room) {
+    // Verify that the building exists
+    const building = await storage.getBuilding(result.data.building_id);
+    if (!building) {
+      return res.status(404).json({ error: 'Building not found' });
+    }
+    
+    const updatedRoom = await storage.updateRoom(id, result.data);
+    
+    if (!updatedRoom) {
       return res.status(404).json({ error: 'Room not found' });
     }
     
-    // If building_id is changing, check if new building exists
-    if (req.body.building_id && req.body.building_id !== room.building_id) {
-      const building = await storage.getBuilding(req.body.building_id);
-      if (!building) {
-        return res.status(400).json({ error: 'New building not found' });
-      }
-    }
-    
-    const updatedRoom = await storage.updateRoom(id, req.body);
-    
     // Log activity
-    await storage.insertActivity({
+    const activityData = {
+      entityId: updatedRoom.id,
       activity: 'room_updated',
-      details: { roomId: id, name: updatedRoom?.name }
-    });
-    
-    // Broadcast to connected clients
-    if (req.app.locals.broadcast) {
-      req.app.locals.broadcast('room_updated', updatedRoom);
-    }
+      details: {
+        name: updatedRoom.name,
+        building: building.name
+      },
+      timestamp: new Date()
+    };
+    await storage.insertActivity(activityData);
     
     res.json(updatedRoom);
   } catch (error) {
-    logger.error('Error updating room', { error, id: req.params.id, data: req.body });
+    logger.error('Error updating room', { error });
     res.status(500).json({ error: 'Failed to update room' });
   }
 };
 
-export const deleteRoom = async (req: Request, res: Response) => {
+const deleteRoom = async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid room ID' });
-    }
     
-    const room = await storage.getRoom(id);
-    if (!room) {
+    // Check if any devices are associated with this room
+    // This would require a getDevicesByRoom function in storage
+    // For now, we'll skip this check
+    
+    const success = await storage.deleteRoom(id);
+    
+    if (!success) {
       return res.status(404).json({ error: 'Room not found' });
     }
     
-    const deleted = await storage.deleteRoom(id);
-    
     // Log activity
-    await storage.insertActivity({
+    const activityData = {
+      entityId: id,
       activity: 'room_deleted',
-      details: { roomId: id, name: room.name }
-    });
-    
-    // Broadcast to connected clients
-    if (req.app.locals.broadcast) {
-      req.app.locals.broadcast('room_deleted', { id });
-    }
+      details: {},
+      timestamp: new Date()
+    };
+    await storage.insertActivity(activityData);
     
     res.json({ success: true });
   } catch (error) {
-    logger.error('Error deleting room', { error, id: req.params.id });
+    logger.error('Error deleting room', { error });
     res.status(500).json({ error: 'Failed to delete room' });
   }
 };

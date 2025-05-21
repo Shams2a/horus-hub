@@ -66,6 +66,13 @@ export default function Settings() {
     serviceTypes: '_hap._tcp.local.,_http._tcp.local.'
   });
   
+  const [databaseSettings, setDatabaseSettings] = useState({
+    useCloud: false,
+    cloudDatabaseUrl: '',
+    syncMode: 'full',
+    syncInterval: 60
+  });
+  
   const [backupName, setBackupName] = useState(`horus-backup-${new Date().toISOString().split('T')[0]}`);
   const [backupOptions, setBackupOptions] = useState({
     includeConfig: true,

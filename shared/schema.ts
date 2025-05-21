@@ -153,3 +153,11 @@ export const deviceStateUpdateSchema = z.object({
   state: z.record(z.any()),
   protocol: z.string().optional(),
 });
+
+// Database configuration schema
+export const databaseConfigSchema = z.object({
+  useCloud: z.boolean().default(false),
+  cloudDatabaseUrl: z.string().optional(),
+  syncMode: z.enum(['readonly', 'writeonly', 'full']).default('full'),
+  syncInterval: z.number().default(60) // in minutes
+});
