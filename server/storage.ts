@@ -2,7 +2,9 @@ import {
   Adapter, InsertAdapter, 
   Device, InsertDevice, 
   Log, InsertLog, 
-  Setting, InsertSetting, 
+  Setting, InsertSetting,
+  Building, InsertBuilding,
+  Room, InsertRoom,
   Activity, InsertActivity 
 } from "@shared/schema";
 
@@ -26,6 +28,21 @@ export interface IStorage {
   updateDevice(id: number, device: Partial<Device>): Promise<Device | undefined>;
   updateDeviceState(id: number, state: Record<string, any>): Promise<Device | undefined>;
   deleteDevice(id: number): Promise<boolean>;
+  
+  // Building operations
+  getBuilding(id: number): Promise<Building | undefined>;
+  getAllBuildings(): Promise<Building[]>;
+  insertBuilding(building: InsertBuilding): Promise<Building>;
+  updateBuilding(id: number, building: Partial<Building>): Promise<Building | undefined>;
+  deleteBuilding(id: number): Promise<boolean>;
+  
+  // Room operations
+  getRoom(id: number): Promise<Room | undefined>;
+  getRoomsByBuilding(buildingId: number): Promise<Room[]>;
+  getAllRooms(): Promise<Room[]>;
+  insertRoom(room: InsertRoom): Promise<Room>;
+  updateRoom(id: number, room: Partial<Room>): Promise<Room | undefined>;
+  deleteRoom(id: number): Promise<boolean>;
   
   // Log operations
   getLog(id: number): Promise<Log | undefined>;
@@ -60,11 +77,15 @@ export class MemStorage implements IStorage {
   private logs: Map<number, Log>;
   private settings: Map<string, Setting>;
   private activities: Map<number, Activity>;
+  private buildings: Map<number, Building>;
+  private rooms: Map<number, Room>;
   
   private nextAdapterId: number;
   private nextDeviceId: number;
   private nextLogId: number;
   private nextActivityId: number;
+  private nextBuildingId: number;
+  private nextRoomId: number;
   
   constructor() {
     this.adapters = new Map();

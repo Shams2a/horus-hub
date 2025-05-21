@@ -67,6 +67,42 @@ export const insertSettingSchema = createInsertSchema(settings).omit({
   updatedAt: true,
 });
 
+// Buildings for organizing rooms
+export const buildings = pgTable("buildings", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  address: text("address"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertBuildingSchema = createInsertSchema(buildings).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+// Rooms for organizing devices
+export const rooms = pgTable("rooms", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  capacity: integer("capacity"),
+  features: jsonb("features").notNull().default([]),
+  status: text("status").notNull().default("active"), // active, inactive
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+  building_id: integer("building_id").notNull(), // Foreign key to buildings table
+  floor: integer("floor").notNull().default(1),
+  description: text("description"),
+  type: text("type"), // bedroom, living room, kitchen, etc.
+});
+
+export const insertRoomSchema = createInsertSchema(rooms).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
 // Activity log (device state changes, connections, etc.)
 export const activities = pgTable("activities", {
   id: serial("id").primaryKey(),
@@ -93,6 +129,12 @@ export type InsertLog = z.infer<typeof insertLogSchema>;
 
 export type Setting = typeof settings.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
+
+export type Building = typeof buildings.$inferSelect;
+export type InsertBuilding = z.infer<typeof insertBuildingSchema>;
+
+export type Room = typeof rooms.$inferSelect;
+export type InsertRoom = z.infer<typeof insertRoomSchema>;
 
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
