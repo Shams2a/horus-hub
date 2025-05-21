@@ -60,6 +60,13 @@ const Locations = () => {
   // Charger les bâtiments
   const { data: buildings = [], isLoading: loadingBuildings, refetch: refetchBuildings } = useQuery({
     queryKey: ['/api/buildings'],
+    queryFn: async () => {
+      const response = await fetch('/api/buildings');
+      if (!response.ok) {
+        throw new Error('Erreur lors du chargement des bâtiments');
+      }
+      return response.json();
+    }
   });
   
   // Charger les salles avec filtre optionnel
@@ -69,7 +76,11 @@ const Locations = () => {
       const url = filterBuildingId 
         ? `/api/rooms?buildingId=${filterBuildingId}` 
         : '/api/rooms';
-      return apiRequest('GET', url);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Erreur lors du chargement des salles');
+      }
+      return response.json();
     }
   });
   
