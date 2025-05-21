@@ -1,0 +1,292 @@
+Guide de développement pour Horus Hub - Plateforme de gestion multi-protocoles IoT
+Objectif de l'application
+
+Horus Hub est une plateforme IoT centralisée conçue pour fonctionner sur Raspberry Pi, permettant la gestion unifiée d'appareils domotiques utilisant différents protocoles de communication (Zigbee, Z-Wave, Wi-Fi, Matter et Thread). L'application sert de pont entre ces différentes technologies et offre une interface unique pour contrôler tous les appareils connectés.
+Fonctionnalités principales
+
+    Interface web pour visualiser et contrôler tous les appareils connectés
+    Support multi-protocoles (Zigbee, Z-Wave, Wi-Fi, Matter, Thread)
+    Gestion des adaptateurs physiques (configuration, détection automatique)
+    Mode simulation pour développement sans matériel physique
+    Communication MQTT pour l'échange de données entre les appareils
+    Journalisation avancée des événements et des erreurs
+    Diagnostic et résolution automatique des problèmes courants
+    Gestion des appareils (ajout, suppression, groupement)
+
+Architecture technique
+Frontend
+
+    HTML/CSS/JavaScript avec Bootstrap 5
+    Interface web responsive servie par Express.js
+
+Backend
+
+    Node.js pour le serveur principal
+    Modules adaptateurs spécifiques à chaque protocole
+    Base de données SQLite pour stocker la configuration et l'état des appareils
+
+Communication
+
+    MQTT pour la communication entre les appareils et le hub
+    API RESTful pour l'interface web
+    Websockets pour les mises à jour en temps réel
+
+Technologies et librairies utilisées
+
+    Node.js : Runtime JavaScript pour le backend
+    Express : Framework web pour servir l'interface utilisateur
+    zigbee-herdsman : Bibliothèque pour la communication avec les appareils Zigbee
+    zwave-js : Bibliothèque pour la communication avec les appareils Z-Wave
+    mqtt : Client MQTT pour la communication
+    winston : Système de journalisation avancé
+    Bootstrap 5 : Framework CSS pour l'interface utilisateur
+    SQLite : Base de données légère pour le stockage
+    PM2 : Gestionnaire de processus pour exécuter l'application en arrière-plan
+
+Étapes de développement recommandées
+1. Initialisation du projet
+
+mkdir horus-hub
+cd horus-hub
+npm init -y
+npm install express mqtt winston zigbee-herdsman zwave-js sqlite3
+
+2. Configuration de l'environnement
+
+    Créer une structure de dossiers organisée :
+        /adapters : Modules pour chaque type d'appareil
+        /config : Fichiers de configuration
+        /web : Interface utilisateur
+        /utils : Utilitaires communs
+        /scripts : Scripts d'installation et de maintenance
+
+    Créer un fichier de configuration de base (config/config.json) :
+
+{
+  "mqtt": {
+    "protocol": "mqtt",
+    "host": "localhost",
+    "port": 1883,
+    "baseTopic": "horus"
+  },
+  "zigbee": {
+    "serialPort": "/dev/ttyUSB0",
+    "baudRate": 115200,
+    "adapterType": "ember",
+    "networkKey": [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
+  },
+  "web": {
+    "port": 8001
+  }
+}
+
+3. Création des composants clés
+Service de journalisation (utils/logger.js)
+
+const winston = require('winston');
+
+// Configurer le logger avec différents niveaux et formats
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'logs/app.log' }),
+    new winston.transports.Console({ format: winston.format.simple() })
+  ]
+});
+
+module.exports = logger;
+
+Adaptateur Zigbee (adapters/zigbee.js)
+
+const { Controller } = require('zigbee-herdsman');
+const logger = require('../utils/logger');
+
+// Initialiser et gérer l'adaptateur Zigbee
+async function start(config, publisher) {
+  try {
+    // Configurer et démarrer le contrôleur Zigbee
+    const controller = new Controller({
+      serialPort: config.serialPort,
+      baudRate: config.baudRate,
+      adapterType: config.adapterType,
+      networkKey: config.networkKey
+    });
+    
+    await controller.start();
+    logger.info('Zigbee adapter started successfully');
+    
+    // Configurer les gestionnaires d'événements
+    controller.on('deviceJoined', (device) => {
+      // Traiter les nouveaux appareils
+    });
+    
+    controller.on('message', (message) => {
+      // Publier les messages reçus via MQTT
+      publisher.publish(`zigbee/device/${message.device.ieeeAddr}`, message.data);
+    });
+    
+    return controller;
+  } catch (error) {
+    logger.error('Failed to start Zigbee adapter', { error });
+    throw error;
+  }
+}
+
+module.exports = { start };
+
+Client MQTT (mqtt/publisher.js)
+
+const mqtt = require('mqtt');
+const logger = require('../utils/logger');
+
+// Créer et gérer la connexion MQTT
+function connect(config) {
+  const client = mqtt.connect(`${config.protocol}://${config.host}:${config.port}`);
+  
+  client.on('connect', () => {
+    logger.info('Connected to MQTT broker');
+  });
+  
+  client.on('error', (error) => {
+    logger.error('MQTT connection error', { error });
+  });
+  
+  // Fonction pour publier des messages
+  function publish(topic, message) {
+    const fullTopic = `${config.baseTopic}/${topic}`;
+    client.publish(fullTopic, JSON.stringify(message));
+  }
+  
+  return { publish };
+}
+
+module.exports = { connect };
+
+Serveur Web (web/server.js)
+
+const express = require('express');
+const path = require('path');
+const logger = require('../utils/logger');
+
+// Configurer et démarrer le serveur web
+function start(config, adapters) {
+  const app = express();
+  
+  // Servir les fichiers statiques
+  app.use(express.static(path.join(__dirname, 'public')));
+  app.use(express.json());
+  
+  // API pour obtenir l'état des adaptateurs
+  app.get('/api/adapters/status', (req, res) => {
+    const status = {};
+    
+    for (const [name, adapter] of Object.entries(adapters)) {
+      status[name] = adapter.getStatus();
+    }
+    
+    res.json(status);
+  });
+  
+  // API pour contrôler les appareils
+  app.post('/api/devices/:id/control', (req, res) => {
+    const { id } = req.params;
+    const { command } = req.body;
+    
+    // Trouver l'adaptateur approprié et envoyer la commande
+    
+    res.json({ success: true });
+  });
+  
+  // Démarrer le serveur
+  const server = app.listen(config.port, () => {
+    logger.info(`Web interface started on port ${config.port}`);
+  });
+  
+  return server;
+}
+
+module.exports = { start };
+
+Point d'entrée principal (index.js)
+
+const fs = require('fs');
+const path = require('path');
+const logger = require('./utils/logger');
+const publisher = require('./mqtt/publisher');
+const zigbeeAdapter = require('./adapters/zigbee');
+const webServer = require('./web/server');
+
+async function startHub() {
+  try {
+    // Charger la configuration
+    const configFile = fs.readFileSync(path.join(__dirname, 'config', 'config.json'), 'utf8');
+    const config = JSON.parse(configFile);
+    
+    logger.info('Configuration loaded successfully');
+    logger.info('Starting Horus Hub...');
+    
+    // Connecter au broker MQTT
+    const mqttClient = publisher.connect(config.mqtt);
+    
+    // Démarrer les adaptateurs
+    const adapters = {};
+    
+    logger.info('Starting zigbee adapter...');
+    adapters.zigbee = await zigbeeAdapter.start(config.zigbee, mqttClient);
+    logger.info('zigbee adapter started successfully');
+    
+    // Démarrer l'interface web
+    webServer.start(config.web, adapters);
+    
+    logger.info('Horus Hub started successfully');
+  } catch (error) {
+    logger.error('Failed to start Horus Hub', { error });
+    process.exit(1);
+  }
+}
+
+// Démarrer l'application
+startHub();
+
+4. Connexion aux services
+
+    Intégrer des scripts pour la gestion des adaptateurs physiques
+    Mettre en place la détection automatique des appareils
+    Créer des wrappers pour gérer les erreurs et les cas particuliers
+    Implémenter un mode développement pour tester sans matériel
+
+5. Tests
+
+    Tester chaque adaptateur individuellement
+    Tester la communication MQTT
+    Tester l'interface web
+    Valider le comportement en mode développement et en mode production
+
+6. Déploiement
+
+    Créer des scripts d'installation pour Raspberry Pi
+    Mettre en place des scripts de démarrage automatique
+
+Pièges à éviter / bonnes pratiques
+
+    Gestion des chemins de fichiers : Utiliser path.join() pour la portabilité entre systèmes d'exploitation.
+
+    Gestion des erreurs avec les adaptateurs : Implémenter des wrappers robustes qui peuvent gérer les défaillances des bibliothèques externes.
+
+    Configuration de l'adaptateur Zigbee : Toujours définir une clé réseau pour la sécurité et s'assurer que les permissions des ports série sont correctes.
+
+    Mode développement : Créer un mode qui simule les appareils pour faciliter le développement sans matériel.
+
+    Journalisation : Mettre en place un système de journalisation détaillé pour faciliter le diagnostic.
+
+    Gestion des permissions : Sur Raspberry Pi, s'assurer que l'utilisateur a accès aux ports USB (groupe dialout).
+
+    Éviter les blocs bloquants : Utiliser des approches asynchrones pour ne pas bloquer la boucle d'événements Node.js.
+
+    Séparation des préoccupations : Garder les adaptateurs, la communication MQTT et l'interface web séparés pour faciliter la maintenance.
+
+    Documentation : Maintenir une documentation claire et precise sur l'installation et l'utilisation du système.
+
+    Configuration autodétectée : Implémenter des scripts qui détectent automatiquement le matériel connecté pour simplifier l'installation.
