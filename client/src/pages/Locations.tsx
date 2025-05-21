@@ -1,34 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { 
-  Tabs, TabsContent, TabsList, TabsTrigger,
-  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle,
-  Button, Input, Label, Dialog, DialogContent, DialogHeader, DialogTitle, 
-  DialogFooter, DialogTrigger, Select, SelectContent, SelectItem, 
-  SelectTrigger, SelectValue, Textarea
-} from '@/components/ui';
-import { queryClient, apiRequest } from '@/lib/queryClient';
-import { Building, Room } from '@shared/schema';
-import { Plus, Edit, Trash2, Home, Building2, ListFilter } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { Textarea } from '../components/ui/textarea';
+import { queryClient, apiRequest } from '../lib/queryClient';
+import { Building2, Home, Plus, Edit, Trash2 } from 'lucide-react';
+import { toast } from '../hooks/use-toast';
+
+// Types simplifiés
+interface Building {
+  id: number;
+  name: string;
+  address: string | null;
+}
+
+interface Room {
+  id: number;
+  name: string;
+  building_id: number;
+  floor: number;
+  type: string | null;
+  capacity: number | null;
+  description: string | null;
+}
 
 const Locations = () => {
-  // State for forms and dialogs
+  // State pour les onglets et filtres
   const [activeTab, setActiveTab] = useState('buildings');
+  const [filterBuildingId, setFilterBuildingId] = useState<number | null>(null);
+  
+  // État pour les formulaires et dialogues
   const [showBuildingDialog, setShowBuildingDialog] = useState(false);
   const [showRoomDialog, setShowRoomDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [filterBuildingId, setFilterBuildingId] = useState<number | null>(null);
-
-  // Form states
+  
+  // États des formulaires
   const [buildingForm, setBuildingForm] = useState({
     id: 0,
     name: '',
     address: ''
   });
-
+  
   const [roomForm, setRoomForm] = useState({
     id: 0,
     name: '',
@@ -36,17 +54,16 @@ const Locations = () => {
     floor: 1,
     type: '',
     capacity: 0,
-    description: '',
-    features: [] as string[]
+    description: ''
   });
-
-  // Fetch buildings
-  const { data: buildings = [], isLoading: loadingBuildings } = useQuery({
+  
+  // Charger les bâtiments
+  const { data: buildings = [], isLoading: loadingBuildings, refetch: refetchBuildings } = useQuery({
     queryKey: ['/api/buildings'],
   });
-
-  // Fetch rooms with optional building filter
-  const { data: rooms = [], isLoading: loadingRooms } = useQuery({
+  
+  // Charger les salles avec filtre optionnel
+  const { data: rooms = [], isLoading: loadingRooms, refetch: refetchRooms } = useQuery({
     queryKey: ['/api/rooms', filterBuildingId],
     queryFn: async () => {
       const url = filterBuildingId 
@@ -55,357 +72,328 @@ const Locations = () => {
       return apiRequest('GET', url);
     }
   });
-
-  // Mutations for buildings
-  const createBuildingMutation = useMutation({
-    mutationFn: (building: Omit<Building, 'id' | 'created_at' | 'updated_at'>) => {
-      return apiRequest('POST', '/api/buildings', building);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/buildings'] });
-      setShowBuildingDialog(false);
-      resetBuildingForm();
-      toast({
-        title: 'Succès',
-        description: 'Bâtiment créé avec succès',
-        variant: 'default',
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Erreur',
-        description: `Échec de la création du bâtiment: ${error}`,
-        variant: 'destructive',
-      });
-    }
-  });
-
-  const updateBuildingMutation = useMutation({
-    mutationFn: (building: Partial<Building> & { id: number }) => {
-      return apiRequest('PUT', `/api/buildings/${building.id}`, building);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/buildings'] });
-      setShowBuildingDialog(false);
-      resetBuildingForm();
-      toast({
-        title: 'Succès',
-        description: 'Bâtiment mis à jour avec succès',
-        variant: 'default',
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Erreur',
-        description: `Échec de la mise à jour du bâtiment: ${error}`,
-        variant: 'destructive',
-      });
-    }
-  });
-
-  const deleteBuildingMutation = useMutation({
-    mutationFn: (id: number) => {
-      return apiRequest('DELETE', `/api/buildings/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/buildings'] });
-      toast({
-        title: 'Succès',
-        description: 'Bâtiment supprimé avec succès',
-        variant: 'default',
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Erreur',
-        description: `Échec de la suppression du bâtiment: ${error.message || 'Impossible de supprimer un bâtiment qui contient des salles'}`,
-        variant: 'destructive',
-      });
-    }
-  });
-
-  // Mutations for rooms
-  const createRoomMutation = useMutation({
-    mutationFn: (room: Omit<Room, 'id' | 'created_at' | 'updated_at' | 'status'>) => {
-      return apiRequest('POST', '/api/rooms', room);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/rooms'] });
-      setShowRoomDialog(false);
-      resetRoomForm();
-      toast({
-        title: 'Succès',
-        description: 'Salle créée avec succès',
-        variant: 'default',
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Erreur',
-        description: `Échec de la création de la salle: ${error}`,
-        variant: 'destructive',
-      });
-    }
-  });
-
-  const updateRoomMutation = useMutation({
-    mutationFn: (room: Partial<Room> & { id: number }) => {
-      return apiRequest('PUT', `/api/rooms/${room.id}`, room);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/rooms'] });
-      setShowRoomDialog(false);
-      resetRoomForm();
-      toast({
-        title: 'Succès',
-        description: 'Salle mise à jour avec succès',
-        variant: 'default',
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Erreur',
-        description: `Échec de la mise à jour de la salle: ${error}`,
-        variant: 'destructive',
-      });
-    }
-  });
-
-  const deleteRoomMutation = useMutation({
-    mutationFn: (id: number) => {
-      return apiRequest('DELETE', `/api/rooms/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/rooms'] });
-      toast({
-        title: 'Succès',
-        description: 'Salle supprimée avec succès',
-        variant: 'default',
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Erreur',
-        description: `Échec de la suppression de la salle: ${error}`,
-        variant: 'destructive',
-      });
-    }
-  });
-
-  // Helper functions
-  const resetBuildingForm = () => {
-    setBuildingForm({
-      id: 0,
-      name: '',
-      address: ''
-    });
-    setIsEditMode(false);
-    setSelectedBuilding(null);
-  };
-
-  const resetRoomForm = () => {
-    setRoomForm({
-      id: 0,
-      name: '',
-      building_id: filterBuildingId || 0,
-      floor: 1,
-      type: '',
-      capacity: 0,
-      description: '',
-      features: []
-    });
-    setIsEditMode(false);
-    setSelectedRoom(null);
-  };
-
-  const handleEditBuilding = (building: Building) => {
-    setBuildingForm({
-      id: building.id,
-      name: building.name,
-      address: building.address || ''
-    });
-    setIsEditMode(true);
-    setSelectedBuilding(building);
-    setShowBuildingDialog(true);
-  };
-
-  const handleEditRoom = (room: Room) => {
-    setRoomForm({
-      id: room.id,
-      name: room.name,
-      building_id: room.building_id,
-      floor: room.floor || 1,
-      type: room.type || '',
-      capacity: room.capacity || 0,
-      description: room.description || '',
-      features: Array.isArray(room.features) ? room.features : []
-    });
-    setIsEditMode(true);
-    setSelectedRoom(room);
-    setShowRoomDialog(true);
-  };
-
-  const handleAddBuilding = () => {
-    resetBuildingForm();
-    setShowBuildingDialog(true);
-  };
-
-  const handleAddRoom = () => {
-    resetRoomForm();
-    setRoomForm(prev => ({
-      ...prev,
-      building_id: filterBuildingId || 0
-    }));
-    setShowRoomDialog(true);
-  };
-
-  const handleSubmitBuilding = (e: React.FormEvent) => {
-    e.preventDefault();
+  
+  // Fonction pour ajouter un bâtiment
+  const handleAddBuilding = async () => {
     if (!buildingForm.name) {
       toast({
-        title: 'Erreur',
-        description: 'Le nom du bâtiment est requis',
-        variant: 'destructive',
+        title: "Erreur",
+        description: "Le nom du bâtiment est requis",
+        variant: "destructive"
       });
       return;
     }
-
-    if (isEditMode && selectedBuilding) {
-      updateBuildingMutation.mutate({
-        id: selectedBuilding.id,
+    
+    try {
+      await apiRequest('POST', '/api/buildings', {
         name: buildingForm.name,
         address: buildingForm.address || null
       });
-    } else {
-      createBuildingMutation.mutate({
+      
+      toast({
+        title: "Succès",
+        description: "Bâtiment ajouté avec succès"
+      });
+      
+      // Réinitialiser le formulaire et fermer le dialogue
+      setBuildingForm({ id: 0, name: '', address: '' });
+      setShowBuildingDialog(false);
+      
+      // Rafraîchir la liste des bâtiments
+      refetchBuildings();
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ajouter le bâtiment",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Fonction pour modifier un bâtiment
+  const handleUpdateBuilding = async () => {
+    if (!buildingForm.name || !selectedBuilding) {
+      return;
+    }
+    
+    try {
+      await apiRequest('PUT', `/api/buildings/${selectedBuilding.id}`, {
         name: buildingForm.name,
         address: buildingForm.address || null
       });
+      
+      toast({
+        title: "Succès",
+        description: "Bâtiment mis à jour avec succès"
+      });
+      
+      // Réinitialiser le formulaire et fermer le dialogue
+      setBuildingForm({ id: 0, name: '', address: '' });
+      setSelectedBuilding(null);
+      setIsEditMode(false);
+      setShowBuildingDialog(false);
+      
+      // Rafraîchir la liste des bâtiments
+      refetchBuildings();
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le bâtiment",
+        variant: "destructive"
+      });
     }
   };
-
-  const handleSubmitRoom = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!roomForm.name) {
+  
+  // Fonction pour supprimer un bâtiment
+  const handleDeleteBuilding = async (id: number) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce bâtiment ?")) {
+      return;
+    }
+    
+    try {
+      await apiRequest('DELETE', `/api/buildings/${id}`);
+      
       toast({
-        title: 'Erreur',
-        description: 'Le nom de la salle est requis',
-        variant: 'destructive',
+        title: "Succès",
+        description: "Bâtiment supprimé avec succès"
+      });
+      
+      // Rafraîchir la liste des bâtiments
+      refetchBuildings();
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le bâtiment. Vérifiez qu'il ne contient pas de salles.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Fonction pour ajouter une salle
+  const handleAddRoom = async () => {
+    if (!roomForm.name || !roomForm.building_id) {
+      toast({
+        title: "Erreur",
+        description: "Le nom de la salle et le bâtiment sont requis",
+        variant: "destructive"
       });
       return;
     }
-
-    if (!roomForm.building_id) {
-      toast({
-        title: 'Erreur',
-        description: 'Veuillez sélectionner un bâtiment',
-        variant: 'destructive',
+    
+    try {
+      await apiRequest('POST', '/api/rooms', {
+        name: roomForm.name,
+        building_id: roomForm.building_id,
+        floor: roomForm.floor,
+        type: roomForm.type || null,
+        capacity: roomForm.capacity || null,
+        description: roomForm.description || null,
+        features: []
       });
+      
+      toast({
+        title: "Succès",
+        description: "Salle ajoutée avec succès"
+      });
+      
+      // Réinitialiser le formulaire et fermer le dialogue
+      setRoomForm({ 
+        id: 0, 
+        name: '', 
+        building_id: filterBuildingId || 0, 
+        floor: 1, 
+        type: '', 
+        capacity: 0, 
+        description: '' 
+      });
+      setShowRoomDialog(false);
+      
+      // Rafraîchir la liste des salles
+      refetchRooms();
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ajouter la salle",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Fonction pour modifier une salle
+  const handleUpdateRoom = async () => {
+    if (!roomForm.name || !roomForm.building_id || !selectedRoom) {
       return;
     }
-
-    const roomData = {
-      name: roomForm.name,
-      building_id: roomForm.building_id,
-      floor: roomForm.floor,
-      type: roomForm.type || null,
-      capacity: roomForm.capacity || null,
-      description: roomForm.description || null,
-      features: roomForm.features
-    };
-
-    if (isEditMode && selectedRoom) {
-      updateRoomMutation.mutate({
-        id: selectedRoom.id,
-        ...roomData
+    
+    try {
+      await apiRequest('PUT', `/api/rooms/${selectedRoom.id}`, {
+        name: roomForm.name,
+        building_id: roomForm.building_id,
+        floor: roomForm.floor,
+        type: roomForm.type || null,
+        capacity: roomForm.capacity || null,
+        description: roomForm.description || null,
+        features: []
       });
+      
+      toast({
+        title: "Succès",
+        description: "Salle mise à jour avec succès"
+      });
+      
+      // Réinitialiser le formulaire et fermer le dialogue
+      setRoomForm({ 
+        id: 0, 
+        name: '', 
+        building_id: filterBuildingId || 0, 
+        floor: 1, 
+        type: '', 
+        capacity: 0, 
+        description: '' 
+      });
+      setSelectedRoom(null);
+      setIsEditMode(false);
+      setShowRoomDialog(false);
+      
+      // Rafraîchir la liste des salles
+      refetchRooms();
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour la salle",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Fonction pour supprimer une salle
+  const handleDeleteRoom = async (id: number) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette salle ?")) {
+      return;
+    }
+    
+    try {
+      await apiRequest('DELETE', `/api/rooms/${id}`);
+      
+      toast({
+        title: "Succès",
+        description: "Salle supprimée avec succès"
+      });
+      
+      // Rafraîchir la liste des salles
+      refetchRooms();
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la salle",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Fonctions utilitaires
+  const openBuildingDialog = (building?: Building) => {
+    if (building) {
+      setBuildingForm({
+        id: building.id,
+        name: building.name,
+        address: building.address || ''
+      });
+      setSelectedBuilding(building);
+      setIsEditMode(true);
     } else {
-      createRoomMutation.mutate(roomData);
+      setBuildingForm({ id: 0, name: '', address: '' });
+      setSelectedBuilding(null);
+      setIsEditMode(false);
     }
+    setShowBuildingDialog(true);
   };
-
-  const handleDeleteBuilding = (id: number) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce bâtiment ? Cette action est irréversible.')) {
-      deleteBuildingMutation.mutate(id);
+  
+  const openRoomDialog = (room?: Room) => {
+    if (room) {
+      setRoomForm({
+        id: room.id,
+        name: room.name,
+        building_id: room.building_id,
+        floor: room.floor,
+        type: room.type || '',
+        capacity: room.capacity || 0,
+        description: room.description || ''
+      });
+      setSelectedRoom(room);
+      setIsEditMode(true);
+    } else {
+      setRoomForm({ 
+        id: 0, 
+        name: '', 
+        building_id: filterBuildingId || 0, 
+        floor: 1, 
+        type: '', 
+        capacity: 0, 
+        description: '' 
+      });
+      setSelectedRoom(null);
+      setIsEditMode(false);
     }
+    setShowRoomDialog(true);
   };
-
-  const handleDeleteRoom = (id: number) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette salle ? Cette action est irréversible.')) {
-      deleteRoomMutation.mutate(id);
-    }
-  };
-
-  const getBuildingName = (buildingId: number) => {
-    const building = buildings.find((b: Building) => b.id === buildingId);
+  
+  // Fonction pour obtenir le nom d'un bâtiment par ID
+  const getBuildingName = (id: number) => {
+    const building = Array.isArray(buildings) 
+      ? buildings.find((b: any) => b.id === id) 
+      : null;
     return building ? building.name : 'Bâtiment inconnu';
   };
-
-  // UI Elements
-  const BuildingsTab = () => (
+  
+  // Rendu pour l'onglet des bâtiments
+  const renderBuildingsTab = () => (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">Liste des bâtiments</h2>
-        <Button onClick={handleAddBuilding} className="flex items-center gap-2">
+        <h2 className="text-2xl font-semibold">Bâtiments</h2>
+        <Button onClick={() => openBuildingDialog()} className="flex items-center gap-2">
           <Plus size={16} /> Ajouter un bâtiment
         </Button>
       </div>
       
       {loadingBuildings ? (
-        <div className="flex justify-center p-8">Chargement des bâtiments...</div>
-      ) : buildings.length === 0 ? (
-        <Card className="mb-4">
-          <CardContent className="p-6 text-center">
-            <Building2 className="mx-auto text-gray-300 mb-2" size={48} />
-            <p className="text-lg text-gray-500">Aucun bâtiment trouvé</p>
-            <p className="text-sm text-gray-400 mt-1">Ajoutez votre premier bâtiment pour commencer à organiser vos appareils</p>
-            <Button onClick={handleAddBuilding} className="mt-4 flex items-center gap-2 mx-auto">
-              <Plus size={16} /> Ajouter un bâtiment
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="text-center py-10">Chargement des bâtiments...</div>
+      ) : Array.isArray(buildings) && buildings.length === 0 ? (
+        <div className="text-center py-10">
+          <Building2 size={48} className="mx-auto text-gray-300 mb-4" />
+          <p className="text-gray-500 mb-2">Aucun bâtiment trouvé</p>
+          <p className="text-gray-400 mb-4">Ajoutez un bâtiment pour commencer à organiser vos appareils</p>
+          <Button onClick={() => openBuildingDialog()} className="flex items-center gap-2 mx-auto">
+            <Plus size={16} /> Ajouter un bâtiment
+          </Button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {buildings.map((building: Building) => (
+          {Array.isArray(buildings) && buildings.map((building: any) => (
             <Card key={building.id} className="overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-xl">{building.name}</CardTitle>
-                  <div className="flex gap-2">
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8" 
-                      onClick={() => handleEditBuilding(building)}
-                    >
+                  <div className="flex space-x-1">
+                    <Button variant="ghost" size="sm" onClick={() => openBuildingDialog(building)}>
                       <Edit size={16} />
                     </Button>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8 text-red-500" 
-                      onClick={() => handleDeleteBuilding(building.id)}
-                    >
+                    <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDeleteBuilding(building.id)}>
                       <Trash2 size={16} />
                     </Button>
                   </div>
                 </div>
                 {building.address && <CardDescription>{building.address}</CardDescription>}
               </CardHeader>
-              <CardContent className="pb-2">
-                <p className="text-sm text-gray-500">
-                  {rooms.filter((room: Room) => room.building_id === building.id).length} salles
-                </p>
-              </CardContent>
-              <CardFooter className="pt-0 flex justify-between">
+              <CardFooter>
                 <Button 
                   variant="outline" 
                   size="sm" 
+                  className="w-full"
                   onClick={() => {
                     setFilterBuildingId(building.id);
                     setActiveTab('rooms');
                   }}
-                  className="w-full"
                 >
                   Voir les salles
                 </Button>
@@ -414,101 +402,51 @@ const Locations = () => {
           ))}
         </div>
       )}
-
-      {/* Dialog for adding/editing buildings */}
-      <Dialog open={showBuildingDialog} onOpenChange={setShowBuildingDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{isEditMode ? 'Modifier le bâtiment' : 'Ajouter un bâtiment'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmitBuilding}>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="building-name">Nom du bâtiment</Label>
-                <Input 
-                  id="building-name" 
-                  placeholder="Nom du bâtiment" 
-                  value={buildingForm.name}
-                  onChange={(e) => setBuildingForm({...buildingForm, name: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="building-address">Adresse (optionnelle)</Label>
-                <Input 
-                  id="building-address" 
-                  placeholder="Adresse du bâtiment" 
-                  value={buildingForm.address || ''}
-                  onChange={(e) => setBuildingForm({...buildingForm, address: e.target.value})}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => {
-                  resetBuildingForm();
-                  setShowBuildingDialog(false);
-                }}
-              >
-                Annuler
-              </Button>
-              <Button type="submit" disabled={createBuildingMutation.isPending || updateBuildingMutation.isPending}>
-                {isEditMode ? 'Mettre à jour' : 'Ajouter'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
-
-  const RoomsTab = () => (
+  
+  // Rendu pour l'onglet des salles
+  const renderRoomsTab = () => (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">Liste des salles</h2>
-        <div className="flex gap-2">
-          <Select value={filterBuildingId?.toString() || ''} onValueChange={(value) => setFilterBuildingId(value ? Number(value) : null)}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filtrer par bâtiment" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Tous les bâtiments</SelectItem>
-              {buildings.map((building: Building) => (
-                <SelectItem key={building.id} value={building.id.toString()}>
-                  {building.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={handleAddRoom} className="flex items-center gap-2">
-            <Plus size={16} /> Ajouter une salle
-          </Button>
+        <div className="flex items-center gap-2">
+          <h2 className="text-2xl font-semibold">Salles</h2>
+          {filterBuildingId && (
+            <span className="bg-blue-100 text-blue-800 text-xs font-medium py-1 px-2 rounded">
+              Bâtiment: {getBuildingName(filterBuildingId)}
+              <button 
+                className="ml-2 text-blue-500"
+                onClick={() => setFilterBuildingId(null)}
+              >
+                ×
+              </button>
+            </span>
+          )}
         </div>
+        <Button onClick={() => openRoomDialog()} className="flex items-center gap-2">
+          <Plus size={16} /> Ajouter une salle
+        </Button>
       </div>
       
       {loadingRooms ? (
-        <div className="flex justify-center p-8">Chargement des salles...</div>
-      ) : rooms.length === 0 ? (
-        <Card className="mb-4">
-          <CardContent className="p-6 text-center">
-            <Home className="mx-auto text-gray-300 mb-2" size={48} />
-            <p className="text-lg text-gray-500">Aucune salle trouvée</p>
-            <p className="text-sm text-gray-400 mt-1">
-              {filterBuildingId 
-                ? "Ce bâtiment ne contient pas encore de salles" 
-                : "Ajoutez votre première salle pour organiser vos appareils"
-              }
-            </p>
-            <Button onClick={handleAddRoom} className="mt-4 flex items-center gap-2 mx-auto">
-              <Plus size={16} /> Ajouter une salle
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="text-center py-10">Chargement des salles...</div>
+      ) : Array.isArray(rooms) && rooms.length === 0 ? (
+        <div className="text-center py-10">
+          <Home size={48} className="mx-auto text-gray-300 mb-4" />
+          <p className="text-gray-500 mb-2">Aucune salle trouvée</p>
+          <p className="text-gray-400 mb-4">
+            {filterBuildingId 
+              ? "Ce bâtiment ne contient pas encore de salles" 
+              : "Ajoutez votre première salle pour organiser vos appareils"
+            }
+          </p>
+          <Button onClick={() => openRoomDialog()} className="flex items-center gap-2 mx-auto">
+            <Plus size={16} /> Ajouter une salle
+          </Button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {rooms.map((room: Room) => (
+          {Array.isArray(rooms) && rooms.map((room: any) => (
             <Card key={room.id} className="overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
@@ -518,21 +456,11 @@ const Locations = () => {
                       {getBuildingName(room.building_id)} • Étage {room.floor}
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8" 
-                      onClick={() => handleEditRoom(room)}
-                    >
+                  <div className="flex space-x-1">
+                    <Button variant="ghost" size="sm" onClick={() => openRoomDialog(room)}>
                       <Edit size={16} />
                     </Button>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8 text-red-500" 
-                      onClick={() => handleDeleteRoom(room.id)}
-                    >
+                    <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDeleteRoom(room.id)}>
                       <Trash2 size={16} />
                     </Button>
                   </div>
@@ -540,130 +468,16 @@ const Locations = () => {
               </CardHeader>
               <CardContent>
                 {room.type && <p className="text-sm text-gray-500 mb-1">Type: {room.type}</p>}
-                {room.capacity > 0 && <p className="text-sm text-gray-500 mb-1">Capacité: {room.capacity} personnes</p>}
+                {room.capacity > 0 && <p className="text-sm text-gray-500 mb-1">Capacité: {room.capacity}</p>}
                 {room.description && <p className="text-sm text-gray-600 mt-2">{room.description}</p>}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
-
-      {/* Dialog for adding/editing rooms */}
-      <Dialog open={showRoomDialog} onOpenChange={setShowRoomDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{isEditMode ? 'Modifier la salle' : 'Ajouter une salle'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmitRoom}>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="room-name">Nom de la salle</Label>
-                <Input 
-                  id="room-name" 
-                  placeholder="Nom de la salle" 
-                  value={roomForm.name}
-                  onChange={(e) => setRoomForm({...roomForm, name: e.target.value})}
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="room-building">Bâtiment</Label>
-                <Select 
-                  value={roomForm.building_id.toString() || ''}
-                  onValueChange={(value) => setRoomForm({...roomForm, building_id: Number(value)})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un bâtiment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {buildings.map((building: Building) => (
-                      <SelectItem key={building.id} value={building.id.toString()}>
-                        {building.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="room-floor">Étage</Label>
-                  <Input 
-                    id="room-floor" 
-                    type="number" 
-                    min="0"
-                    placeholder="Étage" 
-                    value={roomForm.floor}
-                    onChange={(e) => setRoomForm({...roomForm, floor: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="room-capacity">Capacité</Label>
-                  <Input 
-                    id="room-capacity" 
-                    type="number" 
-                    min="0"
-                    placeholder="Capacité" 
-                    value={roomForm.capacity || ''}
-                    onChange={(e) => setRoomForm({...roomForm, capacity: parseInt(e.target.value) || 0})}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="room-type">Type de salle</Label>
-                <Select 
-                  value={roomForm.type}
-                  onValueChange={(value) => setRoomForm({...roomForm, type: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bedroom">Chambre</SelectItem>
-                    <SelectItem value="living">Salon</SelectItem>
-                    <SelectItem value="kitchen">Cuisine</SelectItem>
-                    <SelectItem value="bathroom">Salle de bain</SelectItem>
-                    <SelectItem value="office">Bureau</SelectItem>
-                    <SelectItem value="garage">Garage</SelectItem>
-                    <SelectItem value="other">Autre</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="room-description">Description</Label>
-                <Textarea 
-                  id="room-description" 
-                  placeholder="Description de la salle" 
-                  value={roomForm.description || ''}
-                  onChange={(e) => setRoomForm({...roomForm, description: e.target.value})}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => {
-                  resetRoomForm();
-                  setShowRoomDialog(false);
-                }}
-              >
-                Annuler
-              </Button>
-              <Button type="submit" disabled={createRoomMutation.isPending || updateRoomMutation.isPending}>
-                {isEditMode ? 'Mettre à jour' : 'Ajouter'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
-
+  
   return (
     <div className="container mx-auto py-6 px-4">
       <h1 className="text-3xl font-bold mb-6">Gestion des emplacements</h1>
@@ -679,13 +493,158 @@ const Locations = () => {
         </TabsList>
         
         <TabsContent value="buildings">
-          <BuildingsTab />
+          {renderBuildingsTab()}
         </TabsContent>
         
         <TabsContent value="rooms">
-          <RoomsTab />
+          {renderRoomsTab()}
         </TabsContent>
       </Tabs>
+      
+      {/* Dialogue pour ajouter/modifier un bâtiment */}
+      <Dialog open={showBuildingDialog} onOpenChange={setShowBuildingDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? 'Modifier le bâtiment' : 'Ajouter un bâtiment'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="building-name">Nom du bâtiment</Label>
+              <Input 
+                id="building-name" 
+                placeholder="Nom du bâtiment" 
+                value={buildingForm.name}
+                onChange={(e) => setBuildingForm({...buildingForm, name: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="building-address">Adresse (optionnelle)</Label>
+              <Input 
+                id="building-address" 
+                placeholder="Adresse du bâtiment" 
+                value={buildingForm.address}
+                onChange={(e) => setBuildingForm({...buildingForm, address: e.target.value})}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowBuildingDialog(false)}
+            >
+              Annuler
+            </Button>
+            <Button 
+              onClick={isEditMode ? handleUpdateBuilding : handleAddBuilding}
+            >
+              {isEditMode ? 'Mettre à jour' : 'Ajouter'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Dialogue pour ajouter/modifier une salle */}
+      <Dialog open={showRoomDialog} onOpenChange={setShowRoomDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? 'Modifier la salle' : 'Ajouter une salle'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="room-name">Nom de la salle</Label>
+              <Input 
+                id="room-name" 
+                placeholder="Nom de la salle" 
+                value={roomForm.name}
+                onChange={(e) => setRoomForm({...roomForm, name: e.target.value})}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="room-building">Bâtiment</Label>
+              <select
+                id="room-building"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={roomForm.building_id}
+                onChange={(e) => setRoomForm({...roomForm, building_id: parseInt(e.target.value)})}
+              >
+                <option value="">Sélectionner un bâtiment</option>
+                {Array.isArray(buildings) && buildings.map((building: any) => (
+                  <option key={building.id} value={building.id}>
+                    {building.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="room-floor">Étage</Label>
+                <Input 
+                  id="room-floor" 
+                  type="number" 
+                  placeholder="Étage" 
+                  value={roomForm.floor}
+                  onChange={(e) => setRoomForm({...roomForm, floor: parseInt(e.target.value) || 1})}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="room-capacity">Capacité</Label>
+                <Input 
+                  id="room-capacity" 
+                  type="number" 
+                  placeholder="Capacité" 
+                  value={roomForm.capacity}
+                  onChange={(e) => setRoomForm({...roomForm, capacity: parseInt(e.target.value) || 0})}
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="room-type">Type de salle</Label>
+              <select
+                id="room-type"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={roomForm.type}
+                onChange={(e) => setRoomForm({...roomForm, type: e.target.value})}
+              >
+                <option value="">Sélectionner un type</option>
+                <option value="bedroom">Chambre</option>
+                <option value="living">Salon</option>
+                <option value="kitchen">Cuisine</option>
+                <option value="bathroom">Salle de bain</option>
+                <option value="office">Bureau</option>
+                <option value="garage">Garage</option>
+                <option value="other">Autre</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="room-description">Description</Label>
+              <Textarea 
+                id="room-description" 
+                placeholder="Description de la salle" 
+                value={roomForm.description}
+                onChange={(e) => setRoomForm({...roomForm, description: e.target.value})}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowRoomDialog(false)}
+            >
+              Annuler
+            </Button>
+            <Button 
+              onClick={isEditMode ? handleUpdateRoom : handleAddRoom}
+            >
+              {isEditMode ? 'Mettre à jour' : 'Ajouter'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
