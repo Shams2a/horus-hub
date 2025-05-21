@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Device } from '@/lib/types';
 import { apiRequest } from '@/lib/queryClient';
@@ -19,9 +18,6 @@ interface DeviceConfigModalProps {
 export default function DeviceConfigModal({ isOpen, onClose, device }: DeviceConfigModalProps) {
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
-  const [brightness, setBrightness] = useState(75);
-  const [colorTemp, setColorTemp] = useState(4000);
-  const [stateReporting, setStateReporting] = useState('realtime');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -29,19 +25,6 @@ export default function DeviceConfigModal({ isOpen, onClose, device }: DeviceCon
     if (device) {
       setName(device.name);
       setLocation(device.location || '');
-      
-      // Set device-specific settings if available
-      if (device.type === 'light' && device.state.brightness) {
-        setBrightness(parseInt(device.state.brightness));
-      }
-      
-      if (device.state.colorTemp) {
-        setColorTemp(parseInt(device.state.colorTemp));
-      }
-      
-      if (device.config.stateReporting) {
-        setStateReporting(device.config.stateReporting);
-      }
     }
   }, [device]);
 
@@ -51,25 +34,10 @@ export default function DeviceConfigModal({ isOpen, onClose, device }: DeviceCon
     try {
       setIsLoading(true);
       
-      // Prepare device settings based on the type
-      const config: Record<string, any> = {
-        stateReporting
-      };
-      
-      // Update device specific state
-      const state: Record<string, any> = {};
-      
-      if (device.type === 'light') {
-        state.brightness = brightness;
-        state.colorTemp = colorTemp;
-      }
-      
       // Call API to update the device
       await apiRequest('PUT', `/api/devices/${device.id}`, {
         name,
-        location,
-        config,
-        state
+        location
       });
       
       // Invalidate queries to refresh data
@@ -127,7 +95,7 @@ export default function DeviceConfigModal({ isOpen, onClose, device }: DeviceCon
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Device Configuration: {device.name}</DialogTitle>
+          <DialogTitle>Device Details: {device.name}</DialogTitle>
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
@@ -179,61 +147,34 @@ export default function DeviceConfigModal({ isOpen, onClose, device }: DeviceCon
             </Select>
           </div>
           
-          {/* Conditional device-specific settings */}
-          {device.type === 'light' && (
-            <div className="space-y-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <Label className="text-sm font-medium">Device Settings</Label>
-              
-              <div className="mb-4 mt-2">
-                <div className="flex justify-between items-center">
-                  <Label className="text-sm">Brightness</Label>
-                  <span className="text-sm">{brightness}%</span>
-                </div>
-                <Slider 
-                  min={0} 
-                  max={100} 
-                  step={1}
-                  value={[brightness]} 
-                  onValueChange={(values) => setBrightness(values[0])} 
-                  className="mt-2"
-                />
+          {/* Display device status and last seen information */}
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <h4 className="text-sm font-medium mb-2">Device Information</h4>
+            
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-gray-500 dark:text-gray-400">Status:</p>
+                <p className="font-medium">{device.status === 'online' ? 'Online' : 'Offline'}</p>
               </div>
               
-              <div className="mb-4">
-                <div className="flex justify-between items-center">
-                  <Label className="text-sm">Color Temperature</Label>
-                  <span className="text-sm">{colorTemp}K</span>
-                </div>
-                <Slider 
-                  min={2700} 
-                  max={6500} 
-                  step={100}
-                  value={[colorTemp]} 
-                  onValueChange={(values) => setColorTemp(values[0])} 
-                  className="mt-2"
-                />
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  <span>Warm</span>
-                  <span>Neutral</span>
-                  <span>Cool</span>
-                </div>
+              <div>
+                <p className="text-gray-500 dark:text-gray-400">Last Seen:</p>
+                <p className="font-medium">
+                  {device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'Never'}
+                </p>
               </div>
               
-              <div className="mb-2">
-                <Label className="text-sm">State Reporting</Label>
-                <Select value={stateReporting} onValueChange={setStateReporting}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="realtime">Real-time</SelectItem>
-                    <SelectItem value="interval">Interval (5 min)</SelectItem>
-                    <SelectItem value="statechange">On state change only</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div>
+                <p className="text-gray-500 dark:text-gray-400">Protocol:</p>
+                <p className="font-medium">{device.protocol.toUpperCase()}</p>
+              </div>
+              
+              <div>
+                <p className="text-gray-500 dark:text-gray-400">Manufacturer:</p>
+                <p className="font-medium">{device.manufacturer || 'Unknown'}</p>
               </div>
             </div>
-          )}
+          </div>
         </div>
         
         <DialogFooter className="flex justify-between">
