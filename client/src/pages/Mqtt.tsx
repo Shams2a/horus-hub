@@ -233,7 +233,6 @@ export default function Mqtt() {
       // Attendre un peu puis rafraîchir le statut
       setTimeout(() => {
         refetchStatus();
-        refetchConfig();
       }, 2000);
       
     } catch (error) {
@@ -669,7 +668,7 @@ export default function Mqtt() {
                         variant="outline" 
                         className="w-full"
                       >
-                        <Zap className="h-4 w-4 mr-2" />
+                        <RefreshCw className="h-4 w-4 mr-2" />
                         Reconnecter
                       </Button>
                     </div>
