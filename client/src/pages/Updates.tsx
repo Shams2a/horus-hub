@@ -60,10 +60,12 @@ export default function Updates() {
   const { toast } = useToast();
 
   // Chargement des mises à jour disponibles
-  const { data: availableUpdates = [], isLoading: loadingUpdates, refetch: refetchUpdates } = useQuery<LibraryVersion[]>({
+  const { data: updatesResponse, isLoading: loadingUpdates, refetch: refetchUpdates } = useQuery({
     queryKey: ['/api/updates/available'],
     refetchInterval: 30000 // Actualiser toutes les 30 secondes
   });
+
+  const availableUpdates = updatesResponse?.updates || [];
 
   // Chargement du statut de mise à jour
   const { data: updateStatus, isLoading: loadingStatus } = useQuery<UpdateStatus>({

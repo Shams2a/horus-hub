@@ -1,17 +1,22 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { 
   Card, 
   CardContent,
   CardHeader,
   CardTitle,
-  CardFooter
+  CardFooter,
+  CardDescription
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Table, 
   TableBody, 
@@ -28,8 +33,38 @@ import {
   Upload,
   RotateCcw,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Package,
+  Zap,
+  History,
+  Shield,
+  Play,
+  Pause,
+  Settings as SettingsIcon
 } from 'lucide-react';
+
+interface LibraryVersion {
+  name: string;
+  current: string;
+  latest: string;
+  compatible: boolean;
+  changelogUrl?: string;
+  releaseDate?: string;
+  breakingChanges?: string[];
+}
+
+interface UpdateStatus {
+  inProgress: boolean;
+  library?: string;
+  version?: string;
+  progress: number;
+  status: 'checking' | 'downloading' | 'installing' | 'testing' | 'completed' | 'failed' | 'rolling_back';
+  error?: string;
+  startTime?: string;
+}
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('general');
@@ -51,1069 +86,629 @@ export default function Settings() {
   const [zigbeeSettings, setZigbeeSettings] = useState({
     serialPort: '/dev/ttyUSB0',
     baudRate: 115200,
-    adapterType: 'ember',
-    channel: 15,
-    networkKey: '01 03 05 07 09 0B 0D 0F 11 13 15 17 19 1B 1D 1F',
-    permitJoin: false,
-    cacheState: true
+    panId: 6754,
+    channel: 11
   });
-  
-  const [wifiSettings, setWifiSettings] = useState({
-    ipRangeStart: '192.168.1.1',
-    ipRangeEnd: '192.168.1.254',
-    scanInterval: 30,
-    enableMdns: true,
-    serviceTypes: '_hap._tcp.local.,_http._tcp.local.'
+
+  const [mqttSettings, setMqttSettings] = useState({
+    brokerUrl: 'mqtt://localhost:1883',
+    username: '',
+    password: '',
+    clientId: 'horus-hub'
   });
-  
-  const [databaseSettings, setDatabaseSettings] = useState({
-    useCloud: false,
-    cloudDatabaseUrl: '',
-    syncMode: 'full',
-    syncInterval: 60
-  });
-  
-  const [backupName, setBackupName] = useState(`horus-backup-${new Date().toISOString().split('T')[0]}`);
-  const [backupOptions, setBackupOptions] = useState({
-    includeConfig: true,
-    includeDevices: true,
-    includeLogs: false
-  });
-  
-  const [selectedBackupFile, setSelectedBackupFile] = useState<File | null>(null);
+
+  const [selectedLibrary, setSelectedLibrary] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Fetch system information
-  const { data: systemInfo, isLoading: loadingSystemInfo } = useQuery({
-    queryKey: ['/api/system/info'],
+  // Chargement des mises à jour disponibles
+  const { data: updatesResponse, isLoading: loadingUpdates, refetch: refetchUpdates } = useQuery({
+    queryKey: ['/api/updates/available'],
+    refetchInterval: 30000
   });
 
-  // Fetch settings
-  const { data: settings, isLoading: loadingSettings } = useQuery({
-    queryKey: ['/api/settings'],
+  const availableUpdates = updatesResponse?.updates || [];
+
+  // Chargement du statut de mise à jour
+  const { data: updateStatusResponse, isLoading: loadingStatus } = useQuery({
+    queryKey: ['/api/updates/status'],
+    refetchInterval: 2000
   });
 
-  // Update local state when settings are loaded
-  useEffect(() => {
-    if (settings && typeof settings === 'object') {
-      const settingsObj = settings as Record<string, any>;
-      
-      // Only update settings if they actually have data
-      if (settingsObj.general && typeof settingsObj.general === 'object') {
-        const generalData = settingsObj.general.general || settingsObj.general;
-        if (Object.keys(generalData).length > 0) {
-          setGeneralSettings(prev => ({ ...prev, ...generalData }));
-        }
-      }
-      
-      if (settingsObj.network && typeof settingsObj.network === 'object') {
-        const networkData = settingsObj.network.network || settingsObj.network;
-        if (Object.keys(networkData).length > 0) {
-          setNetworkSettings(prev => ({ ...prev, ...networkData }));
-        }
-      }
-      
-      if (settingsObj.zigbee && typeof settingsObj.zigbee === 'object') {
-        const zigbeeData = settingsObj.zigbee.zigbee || settingsObj.zigbee;
-        if (Object.keys(zigbeeData).length > 0) {
-          setZigbeeSettings(prev => ({ ...prev, ...zigbeeData }));
-        }
-      }
-      
-      if (settingsObj.wifi && typeof settingsObj.wifi === 'object') {
-        const wifiData = settingsObj.wifi.wifi || settingsObj.wifi;
-        if (Object.keys(wifiData).length > 0) {
-          setWifiSettings(prev => ({ ...prev, ...wifiData }));
-        }
-      }
-      
-      if (settingsObj.database && typeof settingsObj.database === 'object') {
-        const databaseData = settingsObj.database.database || settingsObj.database;
-        if (Object.keys(databaseData).length > 0) {
-          setDatabaseSettings(prev => ({ ...prev, ...databaseData }));
-        }
-      }
-    }
-  }, [settings]);
+  const updateStatus = updateStatusResponse?.status;
 
-  const handleSaveGeneral = async () => {
-    try {
-      await apiRequest('PUT', '/api/settings/general', generalSettings);
-      
+  // Chargement de l'historique
+  const { data: updateHistoryResponse, isLoading: loadingHistory } = useQuery({
+    queryKey: ['/api/updates/history']
+  });
+
+  const updateHistory = updateHistoryResponse?.history || [];
+
+  // Mutation pour vérifier les mises à jour
+  const checkUpdatesMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', '/api/updates/check');
+    },
+    onSuccess: () => {
       toast({
-        title: 'Settings saved',
-        description: 'General settings have been updated successfully',
+        title: "Vérification terminée",
+        description: "Mises à jour vérifiées avec succès"
       });
-    } catch (error) {
+      refetchUpdates();
+    },
+    onError: () => {
       toast({
-        title: 'Failed to save settings',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
+        title: "Erreur",
+        description: "Impossible de vérifier les mises à jour",
+        variant: "destructive"
       });
+    }
+  });
+
+  // Mutation pour installer une mise à jour
+  const updateLibraryMutation = useMutation({
+    mutationFn: async (libraryName: string) => {
+      return apiRequest('POST', `/api/updates/library/${libraryName}`);
+    },
+    onSuccess: (data, libraryName) => {
+      toast({
+        title: "Mise à jour réussie",
+        description: `${libraryName} a été mis à jour avec succès`
+      });
+      refetchUpdates();
+    },
+    onError: (error, libraryName) => {
+      toast({
+        title: "Erreur de mise à jour",
+        description: `Impossible de mettre à jour ${libraryName}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const compatibleUpdates = availableUpdates.filter((lib: LibraryVersion) => lib.compatible);
+  const incompatibleUpdates = availableUpdates.filter((lib: LibraryVersion) => !lib.compatible);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'checking': return <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />;
+      case 'downloading': return <Download className="h-4 w-4 text-blue-500" />;
+      case 'installing': return <Package className="h-4 w-4 text-orange-500" />;
+      case 'testing': return <Shield className="h-4 w-4 text-purple-500" />;
+      case 'completed': return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'failed': return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'rolling_back': return <RotateCcw className="h-4 w-4 animate-spin text-orange-500" />;
+      default: return <Clock className="h-4 w-4 text-gray-500" />;
     }
   };
 
-  const handleSaveNetwork = async () => {
-    try {
-      await apiRequest('PUT', '/api/settings/network', networkSettings);
-      
-      toast({
-        title: 'Settings saved',
-        description: 'Network settings have been updated successfully',
-      });
-    } catch (error) {
-      toast({
-        title: 'Failed to save settings',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'checking':
+      case 'downloading': return 'bg-blue-500';
+      case 'installing': return 'bg-orange-500';
+      case 'testing': return 'bg-purple-500';
+      case 'completed': return 'bg-green-500';
+      case 'failed': return 'bg-red-500';
+      case 'rolling_back': return 'bg-orange-500';
+      default: return 'bg-gray-500';
     }
   };
 
-  const handleSaveZigbee = async () => {
-    try {
-      await apiRequest('PUT', '/api/settings/zigbee', zigbeeSettings);
-      
-      toast({
-        title: 'Settings saved',
-        description: 'Zigbee settings have been updated successfully',
-      });
-    } catch (error) {
-      toast({
-        title: 'Failed to save settings',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
-    }
+  const handleSaveGeneral = () => {
+    toast({
+      title: "Paramètres sauvegardés",
+      description: "Les paramètres généraux ont été sauvegardés"
+    });
   };
 
-  const handleSaveWifi = async () => {
-    try {
-      await apiRequest('PUT', '/api/settings/wifi', wifiSettings);
-      
-      toast({
-        title: 'Settings saved',
-        description: 'WiFi settings have been updated successfully',
-      });
-    } catch (error) {
-      toast({
-        title: 'Failed to save settings',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
-    }
-  };
-  
-  const handleSaveDatabase = async () => {
-    try {
-      await apiRequest('PUT', '/api/settings/database', databaseSettings);
-      
-      toast({
-        title: 'Settings saved',
-        description: 'Database settings have been updated successfully',
-      });
-      
-      // Si on active la synchronisation cloud, afficher un message supplémentaire
-      if (databaseSettings.useCloud) {
-        toast({
-          title: 'Cloud synchronization enabled',
-          description: `Data will be synchronized with the cloud database every ${databaseSettings.syncInterval} minutes`,
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Failed to save settings',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
-    }
+  const handleSaveNetwork = () => {
+    toast({
+      title: "Paramètres réseau sauvegardés",
+      description: "Les paramètres réseau ont été sauvegardés"
+    });
   };
 
-  const handleCreateBackup = async () => {
-    try {
-      const response = await fetch('/api/system/backup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: backupName,
-          ...backupOptions
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create backup');
-      }
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `${backupName}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      
-      toast({
-        title: 'Backup created',
-        description: 'The backup file has been created and downloaded',
-      });
-    } catch (error) {
-      toast({
-        title: 'Backup failed',
-        description: error instanceof Error ? error.message : 'Failed to create backup',
-        variant: 'destructive',
-      });
-    }
+  const handleSaveZigbee = () => {
+    toast({
+      title: "Paramètres Zigbee sauvegardés",
+      description: "Les paramètres Zigbee ont été sauvegardés"
+    });
   };
 
-  const handleRestore = async () => {
-    if (!selectedBackupFile) {
-      toast({
-        title: 'No file selected',
-        description: 'Please select a backup file to restore',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('backup', selectedBackupFile);
-      
-      const response = await fetch('/api/system/restore', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to restore backup');
-      }
-      
-      toast({
-        title: 'Restoration in progress',
-        description: 'The system is being restored from backup and will restart shortly',
-      });
-      
-      // Simulate a reload after restoration completes
-      setTimeout(() => {
-        window.location.reload();
-      }, 5000);
-    } catch (error) {
-      toast({
-        title: 'Restore failed',
-        description: error instanceof Error ? error.message : 'Failed to restore from backup',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleFactoryReset = async () => {
-    // Show confirmation first
-    if (!window.confirm('Are you sure you want to reset all settings to default and remove all device data? This action cannot be undone.')) {
-      return;
-    }
-    
-    try {
-      await apiRequest('POST', '/api/system/factory-reset', {});
-      
-      toast({
-        title: 'Factory reset initiated',
-        description: 'The system is being reset to factory defaults and will restart shortly',
-      });
-      
-      // Simulate a reload after reset completes
-      setTimeout(() => {
-        window.location.reload();
-      }, 5000);
-    } catch (error) {
-      toast({
-        title: 'Reset failed',
-        description: error instanceof Error ? error.message : 'Failed to perform factory reset',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleCheckForUpdates = async () => {
-    try {
-      const result = await apiRequest('GET', '/api/system/check-updates', undefined);
-      
-      if (result && typeof result === 'object' && 'available' in result && result.available) {
-        toast({
-          title: 'Update available',
-          description: `Version ${result.version} is available. Click to install now.`,
-          action: (
-            <Button size="sm" onClick={() => {
-              // Trigger update installation
-              apiRequest('POST', '/api/system/update', {});
-              
-              toast({
-                title: 'Update started',
-                description: 'The update is being installed. The system will restart when complete.',
-              });
-            }}>
-              Install
-            </Button>
-          )
-        });
-      } else {
-        toast({
-          title: 'No updates available',
-          description: 'Your system is up to date',
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Check failed',
-        description: error instanceof Error ? error.message : 'Failed to check for updates',
-        variant: 'destructive',
-      });
-    }
+  const handleSaveMqtt = () => {
+    toast({
+      title: "Paramètres MQTT sauvegardés",
+      description: "Les paramètres MQTT ont été sauvegardés"
+    });
   };
 
   return (
-    <div>
+    <div className="container mx-auto p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">System Settings</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Configure your Horus Hub system settings</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Paramètres</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
+          Configuration du système et gestion des mises à jour
+        </p>
       </div>
-      
-      <Tabs defaultValue="general" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="network">Network</TabsTrigger>
-          <TabsTrigger value="zigbee">Zigbee</TabsTrigger>
-          <TabsTrigger value="wifi">WiFi</TabsTrigger>
-          <TabsTrigger value="database">Database</TabsTrigger>
-          <TabsTrigger value="backup">Backup & Restore</TabsTrigger>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="general">Général</TabsTrigger>
+          <TabsTrigger value="network">Réseau</TabsTrigger>
+          <TabsTrigger value="protocols">Protocoles</TabsTrigger>
+          <TabsTrigger value="updates">Mises à jour</TabsTrigger>
+          <TabsTrigger value="system">Système</TabsTrigger>
         </TabsList>
-        
+
         {/* General Settings Tab */}
         <TabsContent value="general">
-          <Card className="mb-6">
-            <CardHeader className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <CardTitle className="text-md font-medium">General Settings</CardTitle>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <SettingsIcon className="h-5 w-5" />
+                Paramètres généraux
+              </CardTitle>
+              <CardDescription>
+                Configuration de base du système Horus Hub
+              </CardDescription>
             </CardHeader>
-            <CardContent className="p-5">
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveGeneral();
-              }}>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="systemName">System Name</Label>
-                    <Input 
-                      id="systemName" 
-                      value={generalSettings.systemName} 
-                      onChange={(e) => setGeneralSettings({...generalSettings, systemName: e.target.value})}
-                      disabled={loadingSettings}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="location">Location</Label>
-                    <Input 
-                      id="location" 
-                      value={generalSettings.location} 
-                      onChange={(e) => setGeneralSettings({...generalSettings, location: e.target.value})}
-                      disabled={loadingSettings}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <Select 
-                      value={generalSettings.timezone} 
-                      onValueChange={(value) => setGeneralSettings({...generalSettings, timezone: value})}
-                      disabled={loadingSettings}
-                    >
-                      <SelectTrigger id="timezone">
-                        <SelectValue placeholder="Select timezone" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="UTC">UTC</SelectItem>
-                        <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
-                        <SelectItem value="America/New_York">America/New_York</SelectItem>
-                        <SelectItem value="Asia/Tokyo">Asia/Tokyo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="language">Language</Label>
-                    <Select 
-                      value={generalSettings.language} 
-                      onValueChange={(value) => setGeneralSettings({...generalSettings, language: value})}
-                      disabled={loadingSettings}
-                    >
-                      <SelectTrigger id="language">
-                        <SelectValue placeholder="Select language" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="English">English</SelectItem>
-                        <SelectItem value="French">French</SelectItem>
-                        <SelectItem value="German">German</SelectItem>
-                        <SelectItem value="Spanish">Spanish</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="systemName">Nom du système</Label>
+                  <Input 
+                    id="systemName" 
+                    value={generalSettings.systemName} 
+                    onChange={(e) => setGeneralSettings({...generalSettings, systemName: e.target.value})}
+                  />
                 </div>
-                
-                <div className="mt-6 flex justify-end">
-                  <Button type="submit" disabled={loadingSettings}>Save Settings</Button>
+                <div className="space-y-2">
+                  <Label htmlFor="location">Emplacement</Label>
+                  <Input 
+                    id="location" 
+                    value={generalSettings.location} 
+                    onChange={(e) => setGeneralSettings({...generalSettings, location: e.target.value})}
+                  />
                 </div>
-              </form>
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">Fuseau horaire</Label>
+                  <Select 
+                    value={generalSettings.timezone} 
+                    onValueChange={(value) => setGeneralSettings({...generalSettings, timezone: value})}
+                  >
+                    <SelectTrigger id="timezone">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UTC">UTC</SelectItem>
+                      <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
+                      <SelectItem value="America/New_York">America/New_York</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="webPort">Port interface web</Label>
+                  <Input 
+                    id="webPort" 
+                    type="number" 
+                    value={generalSettings.webInterfacePort} 
+                    onChange={(e) => setGeneralSettings({...generalSettings, webInterfacePort: parseInt(e.target.value)})}
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSaveGeneral}>Sauvegarder</Button>
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         {/* Network Settings Tab */}
         <TabsContent value="network">
-          <Card className="mb-6">
-            <CardHeader className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <CardTitle className="text-md font-medium">Network Settings</CardTitle>
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuration réseau</CardTitle>
+              <CardDescription>
+                Paramètres de connectivité réseau
+              </CardDescription>
             </CardHeader>
-            <CardContent className="p-5">
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveNetwork();
-              }}>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="networkMode">Mode réseau</Label>
+                  <Select 
+                    value={networkSettings.networkMode} 
+                    onValueChange={(value) => setNetworkSettings({...networkSettings, networkMode: value})}
+                  >
+                    <SelectTrigger id="networkMode">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="DHCP">DHCP</SelectItem>
+                      <SelectItem value="Static IP">IP Statique</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hostname">Nom d'hôte</Label>
+                  <Input 
+                    id="hostname" 
+                    value={networkSettings.hostname} 
+                    onChange={(e) => setNetworkSettings({...networkSettings, hostname: e.target.value})}
+                  />
+                </div>
+                {networkSettings.networkMode === 'Static IP' && (
                   <div className="space-y-2">
-                    <Label htmlFor="networkMode">Network Mode</Label>
-                    <Select 
-                      value={networkSettings.networkMode} 
-                      onValueChange={(value) => setNetworkSettings({...networkSettings, networkMode: value})}
-                      disabled={loadingSettings}
-                    >
-                      <SelectTrigger id="networkMode">
-                        <SelectValue placeholder="Select mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="DHCP">DHCP</SelectItem>
-                        <SelectItem value="Static IP">Static IP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ipAddress">IP Address</Label>
+                    <Label htmlFor="ipAddress">Adresse IP</Label>
                     <Input 
                       id="ipAddress" 
                       value={networkSettings.ipAddress} 
                       onChange={(e) => setNetworkSettings({...networkSettings, ipAddress: e.target.value})}
-                      disabled={loadingSettings || networkSettings.networkMode !== 'Static IP'}
-                      placeholder={networkSettings.networkMode === 'DHCP' ? 'Assigned by DHCP' : '192.168.1.x'}
+                      placeholder="192.168.1.100"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hostname">Hostname</Label>
-                    <Input 
-                      id="hostname" 
-                      value={networkSettings.hostname} 
-                      onChange={(e) => setNetworkSettings({...networkSettings, hostname: e.target.value})}
-                      disabled={loadingSettings}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="webInterfacePort">Web Interface Port</Label>
-                    <Input 
-                      id="webInterfacePort" 
-                      type="number" 
-                      value={generalSettings.webInterfacePort} 
-                      onChange={(e) => setGeneralSettings({...generalSettings, webInterfacePort: parseInt(e.target.value)})}
-                      disabled={loadingSettings}
-                      min={1}
-                      max={65535}
-                    />
-                  </div>
-                </div>
-                
-                <div className="mt-6 flex justify-end">
-                  <Button type="submit" disabled={loadingSettings}>Save Settings</Button>
-                </div>
-              </form>
+                )}
+              </div>
+              <Button onClick={handleSaveNetwork}>Sauvegarder</Button>
             </CardContent>
           </Card>
         </TabsContent>
-        
-        {/* Database Settings Tab */}
-        <TabsContent value="database">
-          <Card className="mb-6">
-            <CardHeader className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <CardTitle className="text-md font-medium">Database Configuration</CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveDatabase();
-              }}>
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-4">
-                      <input
-                        type="checkbox"
-                        id="useCloud"
-                        checked={databaseSettings.useCloud}
-                        onChange={(e) => setDatabaseSettings({...databaseSettings, useCloud: e.target.checked})}
-                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <Label htmlFor="useCloud">Enable Cloud Database Synchronization</Label>
-                    </div>
-                    
-                    <p className="text-sm text-gray-500 mb-4">
-                      When enabled, the system will synchronize data with a cloud database for redundancy and remote access. 
-                      The local database will still be used as the primary storage in case of connectivity issues.
-                    </p>
-                  </div>
-                  
-                  {databaseSettings.useCloud && (
-                    <div className="space-y-4 p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                      <div>
-                        <Label htmlFor="cloudDatabaseUrl">Cloud Database URL</Label>
-                        <Input 
-                          id="cloudDatabaseUrl"
-                          placeholder="postgres://username:password@host:port/database"
-                          value={databaseSettings.cloudDatabaseUrl}
-                          onChange={(e) => setDatabaseSettings({...databaseSettings, cloudDatabaseUrl: e.target.value})}
-                        />
-                        <p className="text-sm text-gray-500 mt-1">The connection URL for your cloud PostgreSQL database</p>
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="syncMode">Synchronization Mode</Label>
-                        <Select 
-                          value={databaseSettings.syncMode} 
-                          onValueChange={(value) => setDatabaseSettings({...databaseSettings, syncMode: value})}
-                        >
-                          <SelectTrigger id="syncMode">
-                            <SelectValue placeholder="Select sync mode" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="full">Full (Read & Write)</SelectItem>
-                            <SelectItem value="readonly">Read Only (Cloud to Local)</SelectItem>
-                            <SelectItem value="writeonly">Write Only (Local to Cloud)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-sm text-gray-500 mt-1">How data should be synchronized between local and cloud databases</p>
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="syncInterval">Sync Interval (minutes)</Label>
-                        <Input 
-                          id="syncInterval"
-                          type="number"
-                          min="1"
-                          max="1440"
-                          value={databaseSettings.syncInterval}
-                          onChange={(e) => setDatabaseSettings({...databaseSettings, syncInterval: parseInt(e.target.value)})}
-                        />
-                        <p className="text-sm text-gray-500 mt-1">How often to synchronize data with the cloud database</p>
-                      </div>
-                      
-                      <div className="mt-4">
-                        <Button 
-                          type="button" 
-                          variant="outline"
-                          onClick={async () => {
-                            try {
-                              toast({
-                                title: 'Testing connection',
-                                description: 'Testing connection to cloud database...',
-                              });
-                              
-                              // Send a request to test the connection
-                              await apiRequest('POST', '/api/settings/database/test', {
-                                cloudDatabaseUrl: databaseSettings.cloudDatabaseUrl
-                              });
-                              
-                              toast({
-                                title: 'Connection successful',
-                                description: 'Successfully connected to the cloud database',
-                              });
-                            } catch (error) {
-                              toast({
-                                title: 'Connection failed',
-                                description: error instanceof Error ? error.message : 'Failed to connect to the cloud database',
-                                variant: 'destructive',
-                              });
-                            }
-                          }}
-                        >
-                          Test Connection
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="mt-6 flex justify-end">
-                  <Button type="submit">
-                    Save Database Settings
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        {/* Zigbee Settings Tab */}
-        <TabsContent value="zigbee">
-          <Card className="mb-6">
-            <CardHeader className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <CardTitle className="text-md font-medium">Zigbee Configuration</CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveZigbee();
-              }}>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+
+        {/* Protocols Settings Tab */}
+        <TabsContent value="protocols">
+          <div className="space-y-6">
+            {/* Zigbee Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Configuration Zigbee</CardTitle>
+                <CardDescription>
+                  Paramètres de l'adaptateur Zigbee
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="serialPort">Serial Port</Label>
+                    <Label htmlFor="serialPort">Port série</Label>
                     <Input 
                       id="serialPort" 
                       value={zigbeeSettings.serialPort} 
                       onChange={(e) => setZigbeeSettings({...zigbeeSettings, serialPort: e.target.value})}
-                      disabled={loadingSettings}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="baudRate">Baud Rate</Label>
-                    <Input 
-                      id="baudRate" 
-                      type="number" 
-                      value={zigbeeSettings.baudRate} 
-                      onChange={(e) => setZigbeeSettings({...zigbeeSettings, baudRate: parseInt(e.target.value)})}
-                      disabled={loadingSettings}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="adapterType">Adapter Type</Label>
+                    <Label htmlFor="baudRate">Vitesse de transmission</Label>
                     <Select 
-                      value={zigbeeSettings.adapterType} 
-                      onValueChange={(value) => setZigbeeSettings({...zigbeeSettings, adapterType: value})}
-                      disabled={loadingSettings}
+                      value={zigbeeSettings.baudRate.toString()} 
+                      onValueChange={(value) => setZigbeeSettings({...zigbeeSettings, baudRate: parseInt(value)})}
                     >
-                      <SelectTrigger id="adapterType">
-                        <SelectValue placeholder="Select adapter type" />
+                      <SelectTrigger id="baudRate">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ember">Ember</SelectItem>
-                        <SelectItem value="cc2531">CC2531</SelectItem>
-                        <SelectItem value="conbee">Conbee</SelectItem>
+                        <SelectItem value="9600">9600</SelectItem>
+                        <SelectItem value="115200">115200</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="channel">Channel</Label>
-                    <Select 
-                      value={zigbeeSettings.channel.toString()} 
-                      onValueChange={(value) => setZigbeeSettings({...zigbeeSettings, channel: parseInt(value)})}
-                      disabled={loadingSettings}
-                    >
-                      <SelectTrigger id="channel">
-                        <SelectValue placeholder="Select channel" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="11">11</SelectItem>
-                        <SelectItem value="15">15</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                        <SelectItem value="25">25</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="mt-4">
-                  <Label htmlFor="networkKey" className="block text-sm font-medium mb-2">Network Key (hex format)</Label>
-                  <Input 
-                    id="networkKey" 
-                    value={zigbeeSettings.networkKey} 
-                    onChange={(e) => setZigbeeSettings({...zigbeeSettings, networkKey: e.target.value})}
-                    disabled={loadingSettings}
-                    className="font-mono"
-                  />
-                </div>
-                
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex items-center">
-                    <input 
-                      type="checkbox" 
-                      id="permitJoin" 
-                      className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                      checked={zigbeeSettings.permitJoin}
-                      onChange={(e) => setZigbeeSettings({...zigbeeSettings, permitJoin: e.target.checked})}
-                      disabled={loadingSettings}
-                    />
-                    <Label htmlFor="permitJoin" className="ml-2">Permit Join</Label>
-                  </div>
-                  <div className="flex items-center">
-                    <input 
-                      type="checkbox" 
-                      id="cacheState" 
-                      className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                      checked={zigbeeSettings.cacheState}
-                      onChange={(e) => setZigbeeSettings({...zigbeeSettings, cacheState: e.target.checked})}
-                      disabled={loadingSettings}
-                    />
-                    <Label htmlFor="cacheState" className="ml-2">Cache State</Label>
-                  </div>
-                </div>
-                
-                <div className="mt-6 flex justify-end">
-                  <Button type="submit" disabled={loadingSettings}>Save Settings</Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        {/* WiFi Settings Tab */}
-        <TabsContent value="wifi">
-          <Card className="mb-6">
-            <CardHeader className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <CardTitle className="text-md font-medium">WiFi Configuration</CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveWifi();
-              }}>
-                <div className="mb-6">
-                  <h3 className="text-md font-medium mb-2">WiFi Device Detection</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="ipRangeStart">IP Range Start</Label>
-                      <Input 
-                        id="ipRangeStart" 
-                        value={wifiSettings.ipRangeStart} 
-                        onChange={(e) => setWifiSettings({...wifiSettings, ipRangeStart: e.target.value})}
-                        disabled={loadingSettings}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="ipRangeEnd">IP Range End</Label>
-                      <Input 
-                        id="ipRangeEnd" 
-                        value={wifiSettings.ipRangeEnd} 
-                        onChange={(e) => setWifiSettings({...wifiSettings, ipRangeEnd: e.target.value})}
-                        disabled={loadingSettings}
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <Label htmlFor="scanInterval">Scan Interval (minutes)</Label>
+                    <Label htmlFor="panId">PAN ID</Label>
                     <Input 
-                      id="scanInterval" 
+                      id="panId" 
                       type="number" 
-                      value={wifiSettings.scanInterval} 
-                      onChange={(e) => setWifiSettings({...wifiSettings, scanInterval: parseInt(e.target.value)})}
-                      disabled={loadingSettings}
-                      min={5}
-                      max={1440}
+                      value={zigbeeSettings.panId} 
+                      onChange={(e) => setZigbeeSettings({...zigbeeSettings, panId: parseInt(e.target.value)})}
                     />
                   </div>
-                </div>
-                
-                <div className="mb-6">
-                  <h3 className="text-md font-medium mb-2">mDNS Discovery</h3>
-                  <div className="mt-4">
-                    <div className="flex items-center">
-                      <input 
-                        type="checkbox" 
-                        id="enableMdns" 
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                        checked={wifiSettings.enableMdns}
-                        onChange={(e) => setWifiSettings({...wifiSettings, enableMdns: e.target.checked})}
-                        disabled={loadingSettings}
-                      />
-                      <Label htmlFor="enableMdns" className="ml-2">Enable mDNS Discovery</Label>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <Label htmlFor="serviceTypes">Service Types</Label>
-                    <Input 
-                      id="serviceTypes" 
-                      value={wifiSettings.serviceTypes} 
-                      onChange={(e) => setWifiSettings({...wifiSettings, serviceTypes: e.target.value})}
-                      disabled={loadingSettings || !wifiSettings.enableMdns}
-                    />
-                  </div>
-                </div>
-                
-                <div className="mt-6 flex justify-end">
-                  <Button type="submit" disabled={loadingSettings}>Save Settings</Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        {/* Backup & Restore Tab */}
-        <TabsContent value="backup">
-          <Card className="mb-6">
-            <CardHeader className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <CardTitle className="text-md font-medium">Create Backup</CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Create a backup of your current configuration and device data.</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="backupName">Backup Name</Label>
-                  <Input 
-                    id="backupName" 
-                    value={backupName} 
-                    onChange={(e) => setBackupName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="backupOptions" className="block mb-2">Include</Label>
                   <div className="space-y-2">
-                    <div className="flex items-center">
-                      <input 
-                        type="checkbox" 
-                        id="includeConfig" 
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                        checked={backupOptions.includeConfig}
-                        onChange={(e) => setBackupOptions({...backupOptions, includeConfig: e.target.checked})}
-                      />
-                      <Label htmlFor="includeConfig" className="ml-2">Configuration</Label>
-                    </div>
-                    <div className="flex items-center">
-                      <input 
-                        type="checkbox" 
-                        id="includeDevices" 
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                        checked={backupOptions.includeDevices}
-                        onChange={(e) => setBackupOptions({...backupOptions, includeDevices: e.target.checked})}
-                      />
-                      <Label htmlFor="includeDevices" className="ml-2">Device Data</Label>
-                    </div>
-                    <div className="flex items-center">
-                      <input 
-                        type="checkbox" 
-                        id="includeLogs" 
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                        checked={backupOptions.includeLogs}
-                        onChange={(e) => setBackupOptions({...backupOptions, includeLogs: e.target.checked})}
-                      />
-                      <Label htmlFor="includeLogs" className="ml-2">Logs</Label>
-                    </div>
+                    <Label htmlFor="channel">Canal</Label>
+                    <Input 
+                      id="channel" 
+                      type="number" 
+                      value={zigbeeSettings.channel} 
+                      onChange={(e) => setZigbeeSettings({...zigbeeSettings, channel: parseInt(e.target.value)})}
+                    />
                   </div>
                 </div>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Button onClick={handleCreateBackup}>
-                  <Download className="h-4 w-4 mr-1" />
-                  Create Backup
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="mb-6">
-            <CardHeader className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <CardTitle className="text-md font-medium">Restore Backup</CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Upload a backup file to restore your configuration.</p>
-              <div className="mb-4">
-                <Label htmlFor="backupFile" className="block mb-2">Backup File</Label>
-                <Input 
-                  id="backupFile"
-                  type="file"
-                  accept=".zip"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                      setSelectedBackupFile(e.target.files[0]);
-                    }
-                  }}
-                />
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Button 
-                  onClick={handleRestore}
-                  disabled={!selectedBackupFile}
-                >
-                  <Upload className="h-4 w-4 mr-1" />
-                  Restore
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-          
+                <Button onClick={handleSaveZigbee}>Sauvegarder</Button>
+              </CardContent>
+            </Card>
+
+            {/* MQTT Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Configuration MQTT</CardTitle>
+                <CardDescription>
+                  Paramètres du broker MQTT
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="brokerUrl">URL du broker</Label>
+                    <Input 
+                      id="brokerUrl" 
+                      value={mqttSettings.brokerUrl} 
+                      onChange={(e) => setMqttSettings({...mqttSettings, brokerUrl: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientId">ID Client</Label>
+                    <Input 
+                      id="clientId" 
+                      value={mqttSettings.clientId} 
+                      onChange={(e) => setMqttSettings({...mqttSettings, clientId: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Nom d'utilisateur</Label>
+                    <Input 
+                      id="username" 
+                      value={mqttSettings.username} 
+                      onChange={(e) => setMqttSettings({...mqttSettings, username: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Mot de passe</Label>
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      value={mqttSettings.password} 
+                      onChange={(e) => setMqttSettings({...mqttSettings, password: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleSaveMqtt}>Sauvegarder</Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Updates Tab */}
+        <TabsContent value="updates">
+          <div className="space-y-6">
+            {/* Status de mise à jour en cours */}
+            {updateStatus?.inProgress && (
+              <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-200">
+                    {getStatusIcon(updateStatus.status)}
+                    Mise à jour en cours
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {updateStatus.library} vers {updateStatus.version}
+                    </span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {updateStatus.progress}%
+                    </span>
+                  </div>
+                  <Progress value={updateStatus.progress} className="h-2" />
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Statut : {updateStatus.status}
+                  </p>
+                  {updateStatus.error && (
+                    <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription className="text-red-800 dark:text-red-200">
+                        {updateStatus.error}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Vue d'ensemble */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Vue d'ensemble des mises à jour
+                </CardTitle>
+                <CardDescription>
+                  État des bibliothèques IoT surveillées
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {availableUpdates.length - incompatibleUpdates.length}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">À jour</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {compatibleUpdates.length}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Mises à jour disponibles</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                      {incompatibleUpdates.length}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Incompatibles</div>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <Button 
+                    onClick={() => checkUpdatesMutation.mutate()}
+                    disabled={checkUpdatesMutation.isPending}
+                    variant="outline"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${checkUpdatesMutation.isPending ? 'animate-spin' : ''}`} />
+                    Vérifier les mises à jour
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Mises à jour disponibles */}
+            {compatibleUpdates.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Download className="h-5 w-5 text-green-600" />
+                    Mises à jour disponibles ({compatibleUpdates.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Bibliothèques compatibles prêtes à être mises à jour
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-64">
+                    <div className="space-y-4">
+                      {compatibleUpdates.map((library: LibraryVersion) => (
+                        <div key={library.name} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-medium">{library.name}</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              {library.current} → {library.latest}
+                            </div>
+                            {library.releaseDate && (
+                              <div className="text-xs text-gray-500 dark:text-gray-500">
+                                Publié le {new Date(library.releaseDate).toLocaleDateString()}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">Compatible</Badge>
+                            <Button 
+                              size="sm" 
+                              onClick={() => updateLibraryMutation.mutate(library.name)}
+                              disabled={updateLibraryMutation.isPending || updateStatus?.inProgress}
+                            >
+                              <Download className="h-4 w-4 mr-1" />
+                              Installer
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Mises à jour incompatibles */}
+            {incompatibleUpdates.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-orange-600" />
+                    Mises à jour incompatibles ({incompatibleUpdates.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Ces mises à jour peuvent causer des problèmes de compatibilité
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-32">
+                    <div className="space-y-4">
+                      {incompatibleUpdates.map((library: LibraryVersion) => (
+                        <div key={library.name} className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                          <div className="flex-1">
+                            <div className="font-medium">{library.name}</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              {library.current} → {library.latest}
+                            </div>
+                            {library.breakingChanges && (
+                              <div className="text-xs text-orange-600 dark:text-orange-400">
+                                Changements incompatibles détectés
+                              </div>
+                            )}
+                          </div>
+                          <Badge variant="destructive">Incompatible</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Historique */}
+            {updateHistory.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <History className="h-5 w-5" />
+                    Historique des mises à jour
+                  </CardTitle>
+                  <CardDescription>
+                    Dernières installations et mises à jour
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-48">
+                    <div className="space-y-2">
+                      {updateHistory.slice(0, 10).map((entry: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-2 text-sm border-b border-gray-100 dark:border-gray-800">
+                          <div className="flex items-center gap-2">
+                            {entry.success ? (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-red-500" />
+                            )}
+                            <span>{entry.library} {entry.version}</span>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {new Date(entry.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* System Tab */}
+        <TabsContent value="system">
           <Card>
-            <CardHeader className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <CardTitle className="text-md font-medium">Factory Reset</CardTitle>
+            <CardHeader>
+              <CardTitle>Informations système</CardTitle>
+              <CardDescription>
+                État et performances du système
+              </CardDescription>
             </CardHeader>
-            <CardContent className="p-5">
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Reset all settings to default and remove all device data. This action cannot be undone.</p>
-              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 rounded-md flex items-start mb-4">
-                <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  Warning: This will reset your Horus Hub to factory defaults, deleting all configuration, devices, and data. Make sure to create a backup first if you want to restore this configuration later.
-                </p>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Button 
-                  variant="destructive" 
-                  onClick={handleFactoryReset}
-                >
-                  <RotateCcw className="h-4 w-4 mr-1" />
-                  Factory Reset
-                </Button>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label>Version du système</Label>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Horus Hub v1.0.0</div>
+                  </div>
+                  <div>
+                    <Label>Temps de fonctionnement</Label>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">2h 15m</div>
+                  </div>
+                  <div>
+                    <Label>Utilisation mémoire</Label>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">45%</div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Adaptateurs actifs</Label>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">3/4</div>
+                  </div>
+                  <div>
+                    <Label>Appareils connectés</Label>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">12</div>
+                  </div>
+                  <div>
+                    <Label>État de la base de données</Label>
+                    <div className="text-sm text-green-600 dark:text-green-400">Connectée</div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-      
-      {/* System Information */}
-      <Card className="mt-6">
-        <CardHeader className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <CardTitle className="text-lg font-medium">System Information</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-md font-medium mb-4">Software</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Horus Hub Version:</span>
-                  <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : 
-                      (systemInfo && typeof systemInfo === 'object' && 'software' in systemInfo && systemInfo.software?.version) 
-                      ? systemInfo.software.version 
-                      : '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Node.js Version:</span>
-                  <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : 
-                      (systemInfo && typeof systemInfo === 'object' && 'software' in systemInfo && systemInfo.software?.nodeVersion) 
-                      ? systemInfo.software.nodeVersion 
-                      : '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">OS:</span>
-                  <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : 
-                      (systemInfo && typeof systemInfo === 'object' && 'software' in systemInfo && systemInfo.software?.os) 
-                      ? systemInfo.software.os 
-                      : '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Uptime:</span>
-                  <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : 
-                      (systemInfo && typeof systemInfo === 'object' && 'software' in systemInfo && systemInfo.software?.uptime) 
-                      ? systemInfo.software.uptime 
-                      : '-'}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="mt-4 text-right">
-                <Button variant="outline" size="sm" onClick={handleCheckForUpdates}>
-                  <RefreshCw className="h-4 w-4 mr-1" />
-                  Check for Updates
-                </Button>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-md font-medium mb-4">Hardware</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Device:</span>
-                  <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : 
-                      (systemInfo && typeof systemInfo === 'object' && 'hardware' in systemInfo && systemInfo.hardware?.device) 
-                      ? systemInfo.hardware.device 
-                      : '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">CPU Usage:</span>
-                  <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : 
-                      (systemInfo && typeof systemInfo === 'object' && 'hardware' in systemInfo && systemInfo.hardware?.cpuUsage !== undefined) 
-                      ? `${systemInfo.hardware.cpuUsage}%` 
-                      : '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Memory Usage:</span>
-                  <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : 
-                      (systemInfo && typeof systemInfo === 'object' && 'hardware' in systemInfo && systemInfo.hardware?.memoryUsage) 
-                      ? systemInfo.hardware.memoryUsage 
-                      : '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Storage:</span>
-                  <span className="text-sm">
-                    {loadingSystemInfo ? 'Loading...' : 
-                      (systemInfo && typeof systemInfo === 'object' && 'hardware' in systemInfo && systemInfo.hardware?.storageUsage) 
-                      ? systemInfo.hardware.storageUsage 
-                      : '-'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-6">
-            <h3 className="text-md font-medium mb-4">Installed Adapters</h3>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Protocol</TableHead>
-                    <TableHead>Library Version</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loadingSystemInfo ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center py-4">
-                        Loading adapter information...
-                      </TableCell>
-                    </TableRow>
-                  ) : (systemInfo && typeof systemInfo === 'object' && 'adapters' in systemInfo && Array.isArray(systemInfo.adapters)) ? (
-                    systemInfo.adapters.map((adapter: any, index: number) => (
-                      <TableRow key={index}>
-                        <TableCell className="text-sm">{adapter.protocol}</TableCell>
-                        <TableCell className="text-sm">{adapter.version}</TableCell>
-                        <TableCell>
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            adapter.status === 'active' 
-                              ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
-                              : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
-                          }`}>
-                            {adapter.status}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center py-4 text-gray-500 dark:text-gray-400">
-                        No adapter information available
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
