@@ -398,7 +398,13 @@ export class MqttAdapter {
       reconnectAttempts: this.reconnectAttempts,
       clientId: this.config.clientId,
       broker: this.config.host,
-      port: this.config.port
+      port: this.config.port,
+      debug: {
+        clientExists: !!this.client,
+        clientConnected: this.client?.connected,
+        started: this.started,
+        isConnecting: this.isConnecting
+      }
     };
   }
 
