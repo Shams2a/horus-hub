@@ -49,6 +49,8 @@ const AdapterManagement = () => {
   const [selectedAdapter, setSelectedAdapter] = useState<string | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [detectionResults, setDetectionResults] = useState<any>(null);
+  const [isDetecting, setIsDetecting] = useState(false);
 
   // Charger le statut des adaptateurs réels uniquement
   const { data: adapters = [], isLoading, refetch } = useQuery({
@@ -150,6 +152,41 @@ const AdapterManagement = () => {
     },
     refetchInterval: 5000, // Actualiser toutes les 5 secondes
   });
+
+  // Charger les adaptateurs recommandés
+  const { data: recommendedAdapters = [] } = useQuery({
+    queryKey: ['/api/adapters/recommended'],
+    queryFn: async () => {
+      const response = await fetch('/api/adapters/recommended');
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.adapters || [];
+    }
+  });
+
+  // Lancer la détection automatique
+  const runDetection = async () => {
+    setIsDetecting(true);
+    try {
+      const response = await fetch('/api/adapters/detect', { method: 'POST' });
+      if (response.ok) {
+        const results = await response.json();
+        setDetectionResults(results);
+        toast({
+          title: "Détection terminée",
+          description: `${results.totalFound} adaptateur(s) détecté(s)`
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de détecter les adaptateurs",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDetecting(false);
+    }
+  };
 
   // Mutations pour les actions sur les adaptateurs
   const restartMutation = useMutation({
@@ -381,6 +418,10 @@ const AdapterManagement = () => {
             <HardDrive size={16} />
             Vue d'ensemble
           </TabsTrigger>
+          <TabsTrigger value="detection" className="flex items-center gap-2">
+            <Activity size={16} />
+            Détection automatique
+          </TabsTrigger>
           <TabsTrigger value="diagnostics" className="flex items-center gap-2">
             <Shield size={16} />
             Diagnostic
@@ -393,6 +434,145 @@ const AdapterManagement = () => {
           ) : (
             renderOverview()
           )}
+        </TabsContent>
+
+        <TabsContent value="detection">
+          <div className="space-y-6">
+            {/* Section de lancement de détection */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Activity size={20} />
+                  <span>Détection Automatique des Adaptateurs</span>
+                </CardTitle>
+                <CardDescription>
+                  Scanne automatiquement votre système pour détecter les adaptateurs Zigbee connectés
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-4">
+                  <Button 
+                    onClick={runDetection} 
+                    disabled={isDetecting}
+                    className="flex items-center space-x-2"
+                  >
+                    <Activity size={16} className={isDetecting ? 'animate-spin' : ''} />
+                    <span>{isDetecting ? 'Détection en cours...' : 'Lancer la détection'}</span>
+                  </Button>
+                  <div className="text-sm text-gray-600">
+                    Détection en 3 phases : matériel → communication → heuristiques
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Résultats de détection */}
+            {detectionResults && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Résultats de la Détection</CardTitle>
+                  <CardDescription>
+                    {detectionResults.totalFound} adaptateur(s) détecté(s) - 
+                    Confiance élevée: {detectionResults.highConfidence}, 
+                    Moyenne: {detectionResults.mediumConfidence}, 
+                    Faible: {detectionResults.lowConfidence}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {detectionResults.adapters.map((result: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <Badge className={
+                              result.confidence === 'high' ? 'bg-green-500' :
+                              result.confidence === 'medium' ? 'bg-yellow-500' : 'bg-gray-500'
+                            }>
+                              Phase {result.phase} - {result.confidence}
+                            </Badge>
+                            {result.adapter && <span className="font-semibold">{result.adapter.name}</span>}
+                          </div>
+                        </div>
+                        
+                        {result.adapter && (
+                          <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
+                            <div><strong>Fabricant:</strong> {result.adapter.manufacturer}</div>
+                            <div><strong>Chipset:</strong> {result.adapter.chipset}</div>
+                            <div><strong>Driver:</strong> {result.adapter.driver}</div>
+                            <div><strong>Fiabilité:</strong> 
+                              <Badge variant={result.adapter.reliability === 'excellent' ? 'default' : 'secondary'} className="ml-2">
+                                {result.adapter.reliability}
+                              </Badge>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {result.devicePath && (
+                          <div className="text-sm text-gray-600 mb-2">
+                            <strong>Chemin:</strong> {result.devicePath}
+                          </div>
+                        )}
+                        
+                        {result.suggestions.length > 0 && (
+                          <div className="mb-2">
+                            <div className="text-sm font-medium text-green-700 mb-1">Suggestions:</div>
+                            <ul className="text-sm text-green-600 list-disc list-inside">
+                              {result.suggestions.map((suggestion: string, i: number) => (
+                                <li key={i}>{suggestion}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {result.issues.length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-red-700 mb-1">Problèmes:</div>
+                            <ul className="text-sm text-red-600 list-disc list-inside">
+                              {result.issues.map((issue: string, i: number) => (
+                                <li key={i}>{issue}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Adaptateurs recommandés */}
+            {recommendedAdapters.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Adaptateurs Recommandés</CardTitle>
+                  <CardDescription>
+                    Adaptateurs Zigbee avec excellente fiabilité et support communautaire
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {recommendedAdapters.slice(0, 4).map((adapter: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold">{adapter.name}</h4>
+                          <Badge className="bg-green-500">{adapter.reliability}</Badge>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <div><strong>Fabricant:</strong> {adapter.manufacturer}</div>
+                          <div><strong>Chipset:</strong> {adapter.chipset}</div>
+                          <div><strong>VID/PID:</strong> {adapter.vid}:{adapter.pid}</div>
+                        </div>
+                        {adapter.notes && (
+                          <div className="text-xs text-gray-500 mt-2">{adapter.notes}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="diagnostics">

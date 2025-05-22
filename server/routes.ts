@@ -9,6 +9,7 @@ import logController from "./controllers/logController";
 import locationController from "./controllers/locationController";
 import databaseController from "./controllers/databaseController";
 import adapterManagementController from "./controllers/adapterManagementController";
+import adapterDetectionController from "./controllers/adapterDetectionController";
 import { AdapterManager } from "./adapters/AdapterManager";
 import { setupZigbeeAdapter } from "./adapters/zigbee";
 import { setupWifiAdapter } from "./adapters/wifi";
@@ -173,6 +174,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/adapters/:protocol/test', adapterManagementController.testAdapter);
   app.post('/api/adapters/:protocol/reset', adapterManagementController.resetAdapter);
   app.post('/api/adapters/:protocol/diagnostics', adapterManagementController.runDiagnostics);
+  
+  // Adapter detection routes
+  app.post('/api/adapters/detect', adapterDetectionController.detectAdapters);
+  app.get('/api/adapters/known', adapterDetectionController.getKnownAdapters);
+  app.get('/api/adapters/recommended', adapterDetectionController.getRecommendedAdaptersList);
+  app.get('/api/adapters/details/:vid/:pid', adapterDetectionController.getAdapterDetails);
+  app.get('/api/adapters/statistics', adapterDetectionController.getAdapterStatistics);
 
   return httpServer;
 }
