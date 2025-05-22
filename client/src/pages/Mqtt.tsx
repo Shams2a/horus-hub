@@ -57,6 +57,7 @@ export default function Mqtt() {
   // Fetch MQTT status
   const { data: mqttStatus, isLoading: loadingStatus, refetch: refetchStatus } = useQuery<MqttStatus>({
     queryKey: ['/api/mqtt/status'],
+    refetchInterval: 3000, // Rafraîchir toutes les 3 secondes
   });
 
   // Fetch MQTT config
