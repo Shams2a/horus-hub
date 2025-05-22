@@ -118,7 +118,7 @@ class MockMqttClient extends EventEmitter {
         } else if (randomTopic.includes('wifi')) {
           message = JSON.stringify({
             online: true,
-            ip: '192.168.1.120',
+            ip: '',
             lastSeen: new Date().toISOString()
           });
         } else {

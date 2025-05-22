@@ -155,8 +155,8 @@ export class MemStorage implements IStorage {
     this.insertSetting({
       key: 'wifi',
       value: {
-        ipRangeStart: '192.168.1.1',
-        ipRangeEnd: '192.168.1.254',
+        ipRangeStart: '',
+        ipRangeEnd: '',
         scanInterval: 30,
         enableMdns: true,
         serviceTypes: '_hap._tcp.local.,_http._tcp.local.'
