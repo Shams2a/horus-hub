@@ -115,7 +115,7 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {mqttStatus?.reconnectAttempts > 0 ? 'Tentative de reconnexion...' : 'Configurer un broker pour commencer'}
+                    {(mqttStatus?.reconnectAttempts || 0) > 0 ? 'Tentative de reconnexion...' : 'Configurer un broker pour commencer'}
                   </p>
                 )}
               </div>

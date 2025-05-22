@@ -88,6 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Make adapter manager available to controllers
     app.locals.adapterManager = adapterManager;
+    setAdapterManager(adapterManager);
     
     logger.info('All adapters initialized');
   } catch (error) {
