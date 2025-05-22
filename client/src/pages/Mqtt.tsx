@@ -1,15 +1,22 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { 
   Card, 
   CardContent,
   CardHeader,
   CardTitle,
+  CardDescription
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Table, 
@@ -23,12 +30,39 @@ import { MqttConfig, MqttStatus, MqttTopic } from '@/lib/types';
 import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { RefreshCw, Plus, Trash2 } from 'lucide-react';
+import { 
+  RefreshCw, 
+  Plus, 
+  Trash2, 
+  Send,
+  Bell,
+  BellOff,
+  Eye,
+  EyeOff,
+  Filter,
+  Download,
+  Upload,
+  Pause,
+  Play,
+  MessageSquare,
+  Settings,
+  Activity
+} from 'lucide-react';
 
 export default function Mqtt() {
   const [editingTopic, setEditingTopic] = useState<string | null>(null);
   const [newTopic, setNewTopic] = useState("");
   const [newTopicQos, setNewTopicQos] = useState<string>("0");
+  const [activeTab, setActiveTab] = useState('overview');
+  const [messages, setMessages] = useState<any[]>([]);
+  const [filteredMessages, setFilteredMessages] = useState<any[]>([]);
+  const [messageFilter, setMessageFilter] = useState('');
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [publishTopic, setPublishTopic] = useState('');
+  const [publishMessage, setPublishMessage] = useState('');
+  const [publishQos, setPublishQos] = useState('0');
+  const [publishRetain, setPublishRetain] = useState(false);
   const { toast } = useToast();
 
   // Fetch MQTT status
@@ -45,6 +79,153 @@ export default function Mqtt() {
   const { data: mqttTopics, isLoading: loadingTopics, refetch: refetchTopics } = useQuery<MqttTopic[]>({
     queryKey: ['/api/mqtt/topics'],
   });
+
+  // Mutations pour la gestion des topics
+  const subscribeMutation = useMutation({
+    mutationFn: async ({ topic, qos }: { topic: string; qos: number }) => {
+      return apiRequest('POST', '/api/mqtt/subscribe', { topic, qos });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Abonnement réussi",
+        description: "Topic ajouté avec succès"
+      });
+      refetchTopics();
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de s'abonner au topic",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const unsubscribeMutation = useMutation({
+    mutationFn: async (topic: string) => {
+      return apiRequest('POST', '/api/mqtt/unsubscribe', { topic });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Désabonnement réussi",
+        description: "Topic supprimé avec succès"
+      });
+      refetchTopics();
+    }
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: async ({ topic, message, qos, retain }: { topic: string; message: string; qos: number; retain: boolean }) => {
+      return apiRequest('POST', '/api/mqtt/publish', { topic, message, qos, retain });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Message publié",
+        description: "Message envoyé avec succès"
+      });
+      setPublishMessage('');
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de publier le message",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Filtrage des messages
+  useEffect(() => {
+    if (messageFilter.trim() === '') {
+      setFilteredMessages(messages);
+    } else {
+      const filtered = messages.filter(msg => 
+        msg.topic.toLowerCase().includes(messageFilter.toLowerCase()) ||
+        msg.payload.toLowerCase().includes(messageFilter.toLowerCase())
+      );
+      setFilteredMessages(filtered);
+    }
+  }, [messages, messageFilter]);
+
+  // Simulation de messages en temps réel (à remplacer par WebSocket)
+  useEffect(() => {
+    if (!isMonitoring) return;
+
+    const interval = setInterval(() => {
+      if (subscriptions.length > 0) {
+        const randomTopic = subscriptions[Math.floor(Math.random() * subscriptions.length)];
+        const newMessage = {
+          id: Date.now(),
+          topic: randomTopic.topic,
+          payload: JSON.stringify({
+            temperature: (20 + Math.random() * 10).toFixed(1),
+            humidity: (40 + Math.random() * 30).toFixed(1),
+            timestamp: new Date().toISOString()
+          }),
+          qos: randomTopic.qos,
+          retain: false,
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [newMessage, ...prev.slice(0, 99)]); // Garder seulement 100 messages
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isMonitoring, subscriptions]);
+
+  // Fonctions utilitaires
+  const handleSubscribe = () => {
+    if (!newTopic.trim()) return;
+    
+    const qos = parseInt(newTopicQos);
+    subscribeMutation.mutate({ topic: newTopic.trim(), qos });
+    
+    // Ajouter à la liste locale des abonnements
+    setSubscriptions(prev => [...prev, { 
+      topic: newTopic.trim(), 
+      qos, 
+      subscribed: true,
+      messageCount: 0
+    }]);
+    
+    setNewTopic('');
+  };
+
+  const handleUnsubscribe = (topic: string) => {
+    unsubscribeMutation.mutate(topic);
+    setSubscriptions(prev => prev.filter(sub => sub.topic !== topic));
+  };
+
+  const handlePublish = () => {
+    if (!publishTopic.trim() || !publishMessage.trim()) return;
+    
+    publishMutation.mutate({
+      topic: publishTopic.trim(),
+      message: publishMessage.trim(),
+      qos: parseInt(publishQos),
+      retain: publishRetain
+    });
+  };
+
+  const exportMessages = () => {
+    const dataStr = JSON.stringify(filteredMessages, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `mqtt-messages-${new Date().toISOString().split('T')[0]}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  const clearMessages = () => {
+    setMessages([]);
+    toast({
+      title: "Messages effacés",
+      description: "L'historique des messages a été vidé"
+    });
+  };
 
   const handleSaveConfig = async () => {
     if (!mqttConfig) return;
