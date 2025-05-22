@@ -10,7 +10,8 @@ import {
   Cloud,
   HardDrive,
   Map,
-  Building2
+  Building2,
+  Download
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 
@@ -109,6 +110,20 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
             >
               <Settings className="h-5 w-5 mr-3" />
               <span>Adaptateurs</span>
+            </Link>
+          </li>
+          <li>
+            <Link 
+              href="/updates" 
+              onClick={closeSidebarOnMobile}
+              className={`flex items-center p-2 rounded-md transition-colors duration-200 ${
+                isActive('/updates') 
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground' 
+                  : 'text-sidebar-foreground hover:bg-sidebar-border'
+              }`}
+            >
+              <Download className="h-5 w-5 mr-3" />
+              <span>Mises à jour</span>
             </Link>
           </li>
           <li>
