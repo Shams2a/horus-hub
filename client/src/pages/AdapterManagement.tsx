@@ -22,7 +22,11 @@ import {
   Activity,
   Zap,
   Shield,
-  Wrench
+  Wrench,
+  Save,
+  Radio,
+  RotateCcw,
+  TestTube
 } from 'lucide-react';
 import { toast } from '../hooks/use-toast';
 
@@ -51,6 +55,8 @@ const AdapterManagement = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [detectionResults, setDetectionResults] = useState<any>(null);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [zigbeeConfig, setZigbeeConfig] = useState<any>(null);
+  const [wifiConfig, setWifiConfig] = useState<any>(null);
 
   // Charger le statut des adaptateurs réels uniquement
   const { data: adapters = [], isLoading, refetch } = useQuery({
@@ -161,6 +167,25 @@ const AdapterManagement = () => {
       if (!response.ok) return [];
       const data = await response.json();
       return data.adapters || [];
+    }
+  });
+
+  // Charger les configurations Zigbee et WiFi
+  const { data: zigbeeStatus } = useQuery({
+    queryKey: ['/api/zigbee/status'],
+    queryFn: async () => {
+      const response = await fetch('/api/zigbee/status');
+      if (!response.ok) return null;
+      return response.json();
+    }
+  });
+
+  const { data: wifiStatus } = useQuery({
+    queryKey: ['/api/wifi/status'],
+    queryFn: async () => {
+      const response = await fetch('/api/wifi/status');
+      if (!response.ok) return null;
+      return response.json();
     }
   });
 
@@ -422,6 +447,10 @@ const AdapterManagement = () => {
             <Activity size={16} />
             Détection automatique
           </TabsTrigger>
+          <TabsTrigger value="configuration" className="flex items-center gap-2">
+            <Settings size={16} />
+            Configuration manuelle
+          </TabsTrigger>
           <TabsTrigger value="diagnostics" className="flex items-center gap-2">
             <Shield size={16} />
             Diagnostic
@@ -572,6 +601,305 @@ const AdapterManagement = () => {
                 </CardContent>
               </Card>
             )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="configuration">
+          <div className="space-y-6">
+            {/* Configuration Zigbee */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Radio size={20} />
+                  <span>Configuration Zigbee</span>
+                </CardTitle>
+                <CardDescription>
+                  Paramètres de l'adaptateur Zigbee et du réseau
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {zigbeeStatus ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Port série</label>
+                        <input 
+                          type="text" 
+                          className="w-full p-2 border rounded-md"
+                          defaultValue="/dev/ttyUSB0"
+                          placeholder="/dev/ttyUSB0"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Débit (Baud Rate)</label>
+                        <select className="w-full p-2 border rounded-md">
+                          <option value="115200">115200</option>
+                          <option value="57600">57600</option>
+                          <option value="38400">38400</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">PAN ID</label>
+                        <input 
+                          type="text" 
+                          className="w-full p-2 border rounded-md"
+                          defaultValue={zigbeeStatus.panId || "0x1a62"}
+                          placeholder="0x1a62"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Canal</label>
+                        <select className="w-full p-2 border rounded-md">
+                          <option value="11">Canal 11</option>
+                          <option value="15">Canal 15</option>
+                          <option value="20">Canal 20</option>
+                          <option value="25">Canal 25</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Coordinateur</label>
+                        <select className="w-full p-2 border rounded-md">
+                          <option value="zStack">TI Z-Stack</option>
+                          <option value="deconz">deCONZ</option>
+                          <option value="zigate">ZiGate</option>
+                          <option value="ember">EmberZNet</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Clé réseau</label>
+                        <input 
+                          type="password" 
+                          className="w-full p-2 border rounded-md"
+                          placeholder="Clé de chiffrement du réseau"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="zigbee-permit-join" />
+                      <label htmlFor="zigbee-permit-join" className="text-sm">
+                        Autoriser l'ajout de nouveaux appareils
+                      </label>
+                    </div>
+                    
+                    <div className="flex space-x-3">
+                      <Button className="flex items-center space-x-2">
+                        <Save size={16} />
+                        <span>Sauvegarder</span>
+                      </Button>
+                      <Button variant="outline" className="flex items-center space-x-2">
+                        <RotateCcw size={16} />
+                        <span>Redémarrer adaptateur</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    Adaptateur Zigbee non détecté
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Configuration WiFi */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Wifi size={20} />
+                  <span>Configuration WiFi</span>
+                </CardTitle>
+                <CardDescription>
+                  Paramètres du réseau WiFi et point d'accès
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {wifiStatus ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Nom du réseau (SSID)</label>
+                        <input 
+                          type="text" 
+                          className="w-full p-2 border rounded-md"
+                          defaultValue={wifiStatus.networkName || "HorusHubNetwork"}
+                          placeholder="HorusHubNetwork"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Mot de passe</label>
+                        <input 
+                          type="password" 
+                          className="w-full p-2 border rounded-md"
+                          placeholder="Mot de passe WiFi"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Canal WiFi</label>
+                        <select className="w-full p-2 border rounded-md">
+                          <option value="auto">Automatique</option>
+                          <option value="1">Canal 1 (2.412 GHz)</option>
+                          <option value="6">Canal 6 (2.437 GHz)</option>
+                          <option value="11">Canal 11 (2.462 GHz)</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Sécurité</label>
+                        <select className="w-full p-2 border rounded-md">
+                          <option value="wpa2">WPA2</option>
+                          <option value="wpa3">WPA3</option>
+                          <option value="wpa2-wpa3">WPA2/WPA3 Mixed</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Adresse IP</label>
+                        <input 
+                          type="text" 
+                          className="w-full p-2 border rounded-md"
+                          defaultValue={wifiStatus.ipAddress || "192.168.1.100"}
+                          placeholder="192.168.1.100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Masque de sous-réseau</label>
+                        <input 
+                          type="text" 
+                          className="w-full p-2 border rounded-md"
+                          defaultValue="255.255.255.0"
+                          placeholder="255.255.255.0"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <input type="checkbox" id="wifi-hidden" />
+                        <label htmlFor="wifi-hidden" className="text-sm">
+                          Réseau masqué (SSID caché)
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input type="checkbox" id="wifi-hotspot" />
+                        <label htmlFor="wifi-hotspot" className="text-sm">
+                          Mode point d'accès (Hotspot)
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-3">
+                      <Button className="flex items-center space-x-2">
+                        <Save size={16} />
+                        <span>Sauvegarder</span>
+                      </Button>
+                      <Button variant="outline" className="flex items-center space-x-2">
+                        <RotateCcw size={16} />
+                        <span>Redémarrer WiFi</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    Adaptateur WiFi non détecté
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Configuration MQTT */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Cloud size={20} />
+                  <span>Configuration MQTT</span>
+                </CardTitle>
+                <CardDescription>
+                  Paramètres de connexion au broker MQTT
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Serveur MQTT</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border rounded-md"
+                        defaultValue="localhost"
+                        placeholder="broker.example.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Port</label>
+                      <input 
+                        type="number" 
+                        className="w-full p-2 border rounded-md"
+                        defaultValue="1883"
+                        placeholder="1883"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Nom d'utilisateur</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border rounded-md"
+                        placeholder="Optionnel"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Mot de passe</label>
+                      <input 
+                        type="password" 
+                        className="w-full p-2 border rounded-md"
+                        placeholder="Optionnel"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Topic racine</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border rounded-md"
+                        defaultValue="horus/"
+                        placeholder="horus/"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Client ID</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border rounded-md"
+                        defaultValue="horus-hub"
+                        placeholder="horus-hub"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="mqtt-ssl" />
+                      <label htmlFor="mqtt-ssl" className="text-sm">
+                        Utiliser SSL/TLS (port 8883)
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" id="mqtt-retain" />
+                      <label htmlFor="mqtt-retain" className="text-sm">
+                        Messages persistants par défaut
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex space-x-3">
+                    <Button className="flex items-center space-x-2">
+                      <Save size={16} />
+                      <span>Sauvegarder</span>
+                    </Button>
+                    <Button variant="outline" className="flex items-center space-x-2">
+                      <TestTube size={16} />
+                      <span>Tester connexion</span>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
