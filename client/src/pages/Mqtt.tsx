@@ -13,19 +13,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
 import { MqttConfig, MqttStatus, MqttTopic } from '@/lib/types';
 import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
@@ -36,12 +27,9 @@ import {
   Trash2, 
   Send,
   Bell,
-  BellOff,
   Eye,
-  EyeOff,
   Filter,
   Download,
-  Upload,
   Pause,
   Play,
   MessageSquare,
@@ -233,434 +221,421 @@ export default function Mqtt() {
     try {
       await apiRequest('PUT', '/api/mqtt/config', mqttConfig);
       
-      // Refresh status
-      refetchStatus();
-      
       toast({
-        title: 'Configuration saved',
-        description: 'MQTT broker configuration has been updated',
-      });
-    } catch (error) {
-      toast({
-        title: 'Failed to save configuration',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleTestConnection = async () => {
-    try {
-      await apiRequest('POST', '/api/mqtt/test', {});
-      
-      toast({
-        title: 'Connection test',
-        description: 'Connection to MQTT broker successful',
+        title: 'Configuration sauvegardée',
+        description: 'Les paramètres MQTT ont été mis à jour',
       });
       
-      // Refresh status
       refetchStatus();
     } catch (error) {
       toast({
-        title: 'Connection test failed',
-        description: error instanceof Error ? error.message : 'Failed to connect to MQTT broker',
+        title: 'Erreur de sauvegarde',
+        description: error instanceof Error ? error.message : 'Impossible de sauvegarder la configuration',
         variant: 'destructive',
       });
     }
-  };
-
-  const handleReconnect = async () => {
-    try {
-      await apiRequest('POST', '/api/mqtt/reconnect', {});
-      
-      toast({
-        title: 'Reconnecting',
-        description: 'Attempting to reconnect to MQTT broker',
-      });
-      
-      // Refresh status after a short delay
-      setTimeout(() => refetchStatus(), 2000);
-    } catch (error) {
-      toast({
-        title: 'Reconnection failed',
-        description: error instanceof Error ? error.message : 'Failed to reconnect to MQTT broker',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleAddTopic = async () => {
-    if (!newTopic) {
-      toast({
-        title: 'Missing topic',
-        description: 'Please enter a topic name',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      await apiRequest('POST', '/api/mqtt/topics', {
-        topic: newTopic,
-        qos: parseInt(newTopicQos),
-      });
-      
-      // Reset form and refresh topics
-      setNewTopic("");
-      setNewTopicQos("0");
-      refetchTopics();
-      
-      toast({
-        title: 'Topic added',
-        description: `Subscribed to topic: ${newTopic}`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Failed to add topic',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDeleteTopic = async (topic: string) => {
-    try {
-      await apiRequest('DELETE', `/api/mqtt/topics/${encodeURIComponent(topic)}`, undefined);
-      
-      // Refresh topics
-      refetchTopics();
-      
-      toast({
-        title: 'Topic deleted',
-        description: `Unsubscribed from topic: ${topic}`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Failed to delete topic',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const updateConfigField = (field: keyof MqttConfig, value: any) => {
-    if (!mqttConfig) return;
-    
-    const updatedConfig = {
-      ...mqttConfig,
-      [field]: value
-    };
-    
-    queryClient.setQueryData(['/api/mqtt/config'], updatedConfig);
   };
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">MQTT Configuration</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Configure your MQTT broker connection for device communication</p>
-      </div>
-      
-      {/* MQTT Status */}
-      <Card className="mb-6">
-        <CardContent className="p-5">
-          <h4 className="text-md font-medium mb-4">Connection Status</h4>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center">
-                <span className={`h-3 w-3 rounded-full mr-2 ${
-                  loadingStatus ? 'bg-gray-400' : 
-                  mqttStatus?.connected ? 'bg-green-500' : 'bg-red-500'
-                }`}></span>
-                <span className="font-medium">
-                  {loadingStatus 
-                    ? 'Loading...' 
-                    : mqttStatus?.connected ? 'Connected' : 'Disconnected'
-                  }
-                </span>
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Broker: {loadingConfig 
-                  ? 'Loading...' 
-                  : mqttConfig 
-                    ? `${mqttConfig.protocol}://${mqttConfig.host}:${mqttConfig.port}` 
-                    : 'Not configured'
-                }
-              </p>
-            </div>
-            <Button variant="outline" onClick={handleReconnect}>
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Reconnect
-            </Button>
-          </div>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Messages Published</p>
-              <p className="font-medium">
-                {loadingStatus ? 'Loading...' : mqttStatus?.messagesPublished || 0}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Messages Received</p>
-              <p className="font-medium">
-                {loadingStatus ? 'Loading...' : mqttStatus?.messagesReceived || 0}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Last Activity</p>
-              <p className="font-medium">
-                {loadingStatus 
-                  ? 'Loading...' 
-                  : mqttStatus?.lastMessageTime 
-                    ? new Date(mqttStatus.lastMessageTime).toLocaleString() 
-                    : 'Never'
-                }
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* MQTT Settings */}
-      <Card className="mb-6">
-        <CardContent className="p-5">
-          <h4 className="text-md font-medium mb-4">Broker Settings</h4>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            handleSaveConfig();
-          }}>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="mqttProtocol">Protocol</Label>
-                <Select 
-                  value={mqttConfig?.protocol} 
-                  onValueChange={(value) => updateConfigField('protocol', value)}
-                  disabled={loadingConfig}
-                >
-                  <SelectTrigger id="mqttProtocol">
-                    <SelectValue placeholder="Select protocol" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mqtt">mqtt</SelectItem>
-                    <SelectItem value="mqtts">mqtts</SelectItem>
-                    <SelectItem value="ws">ws</SelectItem>
-                    <SelectItem value="wss">wss</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mqttHost">Host</Label>
-                <Input 
-                  id="mqttHost" 
-                  value={mqttConfig?.host || ''} 
-                  onChange={(e) => updateConfigField('host', e.target.value)}
-                  disabled={loadingConfig}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mqttPort">Port</Label>
-                <Input 
-                  id="mqttPort" 
-                  type="number" 
-                  value={mqttConfig?.port || ''} 
-                  onChange={(e) => updateConfigField('port', parseInt(e.target.value))}
-                  disabled={loadingConfig}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mqttBaseTopic">Base Topic</Label>
-                <Input 
-                  id="mqttBaseTopic" 
-                  value={mqttConfig?.baseTopic || ''} 
-                  onChange={(e) => updateConfigField('baseTopic', e.target.value)}
-                  disabled={loadingConfig}
-                />
-              </div>
-            </div>
-            
-            <div className="mt-6">
-              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Authentication</h5>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="mqttUsername">Username</Label>
-                  <Input 
-                    id="mqttUsername" 
-                    value={mqttConfig?.username || ''} 
-                    onChange={(e) => updateConfigField('username', e.target.value)}
-                    disabled={loadingConfig}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="mqttPassword">Password</Label>
-                  <Input 
-                    id="mqttPassword" 
-                    type="password" 
-                    value={mqttConfig?.password || ''} 
-                    onChange={(e) => updateConfigField('password', e.target.value)}
-                    disabled={loadingConfig}
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-6">
-              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Advanced Options</h5>
-              <div className="space-y-3">
-                <div className="flex items-center">
-                  <Switch 
-                    id="cleanSession" 
-                    checked={mqttConfig?.cleanSession || false}
-                    onCheckedChange={(checked) => updateConfigField('cleanSession', checked)}
-                    disabled={loadingConfig}
-                  />
-                  <Label htmlFor="cleanSession" className="ml-2">Clean Session</Label>
-                </div>
-                <div className="flex items-center">
-                  <Switch 
-                    id="retainMessages" 
-                    checked={mqttConfig?.retainMessages || false}
-                    onCheckedChange={(checked) => updateConfigField('retainMessages', checked)}
-                    disabled={loadingConfig}
-                  />
-                  <Label htmlFor="retainMessages" className="ml-2">Retain Messages</Label>
-                </div>
-                <div className="flex items-center">
-                  <Switch 
-                    id="persistentConnection" 
-                    checked={mqttConfig?.persistentConnection || false}
-                    onCheckedChange={(checked) => updateConfigField('persistentConnection', checked)}
-                    disabled={loadingConfig}
-                  />
-                  <Label htmlFor="persistentConnection" className="ml-2">Persistent Connection</Label>
-                </div>
-                <div className="flex items-center">
-                  <Switch 
-                    id="useTls" 
-                    checked={mqttConfig?.useTls || false}
-                    onCheckedChange={(checked) => updateConfigField('useTls', checked)}
-                    disabled={loadingConfig}
-                  />
-                  <Label htmlFor="useTls" className="ml-2">Use TLS</Label>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-6 flex items-center space-x-2">
-              <Button type="submit" disabled={loadingConfig}>Save Changes</Button>
-              <Button type="button" variant="outline" onClick={handleTestConnection} disabled={loadingConfig}>
-                Test Connection
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-      
-      {/* MQTT Topics */}
-      <Card>
-        <CardHeader className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-          <CardTitle className="text-md font-medium">Monitored Topics</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => {
-            setEditingTopic('new');
-            setNewTopic('');
-            setNewTopicQos('0');
-          }}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add Topic
+    <div className="container mx-auto py-6 px-4">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">MQTT - Gestion des Topics</h1>
+        <div className="flex items-center space-x-2">
+          <Badge variant={mqttStatus?.connected ? "default" : "destructive"}>
+            {mqttStatus?.connected ? "Connecté" : "Déconnecté"}
+          </Badge>
+          <Button onClick={() => refetchStatus()} size="sm">
+            <RefreshCw className="h-4 w-4" />
           </Button>
-        </CardHeader>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Topic</TableHead>
-                <TableHead>QoS</TableHead>
-                <TableHead>Last Message</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {editingTopic === 'new' && (
-                <TableRow>
-                  <TableCell>
-                    <Input
-                      value={newTopic}
-                      onChange={(e) => setNewTopic(e.target.value)}
-                      placeholder="Enter topic (e.g. horus/devices/+/state)"
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Activity size={16} />
+            Vue d'ensemble
+          </TabsTrigger>
+          <TabsTrigger value="topics" className="flex items-center gap-2">
+            <Bell size={16} />
+            Abonnements
+          </TabsTrigger>
+          <TabsTrigger value="publish" className="flex items-center gap-2">
+            <Send size={16} />
+            Publication
+          </TabsTrigger>
+          <TabsTrigger value="monitor" className="flex items-center gap-2">
+            <MessageSquare size={16} />
+            Monitoring
+          </TabsTrigger>
+          <TabsTrigger value="config" className="flex items-center gap-2">
+            <Settings size={16} />
+            Configuration
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Vue d'ensemble */}
+        <TabsContent value="overview">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Connexion</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-2">
+                  <div className={`w-3 h-3 rounded-full ${mqttStatus?.connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="font-medium">{mqttStatus?.connected ? 'En ligne' : 'Hors ligne'}</span>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Messages reçus</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{mqttStatus?.messagesReceived || 0}</div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Messages publiés</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{mqttStatus?.messagesPublished || 0}</div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Abonnements actifs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{subscriptions.length}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Abonnements récents</CardTitle>
+              <CardDescription>Derniers topics configurés</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {subscriptions.length > 0 ? (
+                <div className="space-y-2">
+                  {subscriptions.slice(0, 5).map((sub, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Bell size={16} className="text-blue-500" />
+                        <span className="font-medium">{sub.topic}</span>
+                        <Badge variant="outline">QoS {sub.qos}</Badge>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setActiveTab('monitor')}
+                      >
+                        <Eye size={14} className="mr-1" />
+                        Surveiller
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  Aucun abonnement configuré
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Gestion des abonnements */}
+        <TabsContent value="topics">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Nouvel abonnement</CardTitle>
+                <CardDescription>S'abonner à un topic MQTT pour recevoir des messages</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-3">
+                  <Input 
+                    placeholder="Topic (ex: sensors/+/temperature)" 
+                    value={newTopic}
+                    onChange={(e) => setNewTopic(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Select value={newTopicQos} onValueChange={setNewTopicQos}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">QoS 0</SelectItem>
+                      <SelectItem value="1">QoS 1</SelectItem>
+                      <SelectItem value="2">QoS 2</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    onClick={handleSubscribe}
+                    disabled={!newTopic.trim() || subscribeMutation.isPending}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    S'abonner
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Abonnements actifs</CardTitle>
+                <CardDescription>Topics auxquels vous êtes abonnés</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {subscriptions.length > 0 ? (
+                  <div className="space-y-3">
+                    {subscriptions.map((sub, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <Bell size={16} className="text-green-500" />
+                          <div>
+                            <div className="font-medium">{sub.topic}</div>
+                            <div className="text-sm text-gray-500">QoS {sub.qos}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline">{sub.messageCount || 0} msg</Badge>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => handleUnsubscribe(sub.topic)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    Aucun abonnement actif
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Publication de messages */}
+        <TabsContent value="publish">
+          <Card>
+            <CardHeader>
+              <CardTitle>Publier un message</CardTitle>
+              <CardDescription>Envoyer un message vers un topic MQTT</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Topic de destination</Label>
+                    <Input 
+                      placeholder="sensors/living_room/temperature"
+                      value={publishTopic}
+                      onChange={(e) => setPublishTopic(e.target.value)}
                     />
-                  </TableCell>
-                  <TableCell>
-                    <Select value={newTopicQos} onValueChange={setNewTopicQos}>
-                      <SelectTrigger className="w-24">
-                        <SelectValue placeholder="QoS" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Qualité de service (QoS)</Label>
+                    <Select value={publishQos} onValueChange={setPublishQos}>
+                      <SelectTrigger>
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="0">0</SelectItem>
-                        <SelectItem value="1">1</SelectItem>
-                        <SelectItem value="2">2</SelectItem>
+                        <SelectItem value="0">QoS 0 - Au maximum une fois</SelectItem>
+                        <SelectItem value="1">QoS 1 - Au moins une fois</SelectItem>
+                        <SelectItem value="2">QoS 2 - Exactement une fois</SelectItem>
                       </SelectContent>
                     </Select>
-                  </TableCell>
-                  <TableCell>-</TableCell>
-                  <TableCell className="text-right">
-                    <Button size="sm" onClick={handleAddTopic} className="mr-2">
-                      Save
-                    </Button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Message</Label>
+                  <Textarea 
+                    placeholder='{"temperature": 23.5, "humidity": 45}'
+                    value={publishMessage}
+                    onChange={(e) => setPublishMessage(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch 
+                    checked={publishRetain}
+                    onCheckedChange={setPublishRetain}
+                  />
+                  <Label>Message persistant (retain)</Label>
+                </div>
+                
+                <Button 
+                  onClick={handlePublish}
+                  disabled={!publishTopic.trim() || !publishMessage.trim() || publishMutation.isPending}
+                  className="w-full"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {publishMutation.isPending ? 'Publication...' : 'Publier le message'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Monitoring des messages */}
+        <TabsContent value="monitor">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Surveillance des messages</span>
+                  <div className="flex items-center space-x-2">
                     <Button 
                       size="sm" 
-                      variant="ghost" 
-                      onClick={() => setEditingTopic(null)}
+                      variant={isMonitoring ? "destructive" : "default"}
+                      onClick={() => setIsMonitoring(!isMonitoring)}
                     >
-                      Cancel
+                      {isMonitoring ? <Pause size={14} /> : <Play size={14} />}
+                      {isMonitoring ? 'Arrêter' : 'Démarrer'}
                     </Button>
-                  </TableCell>
-                </TableRow>
-              )}
-              
-              {loadingTopics ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-4">
-                    Loading topics...
-                  </TableCell>
-                </TableRow>
-              ) : mqttTopics && mqttTopics.length > 0 ? (
-                mqttTopics.map((topicItem) => (
-                  <TableRow key={topicItem.topic}>
-                    <TableCell className="font-mono text-sm">
-                      {topicItem.topic}
-                    </TableCell>
-                    <TableCell>{topicItem.qos}</TableCell>
-                    <TableCell>
-                      {topicItem.lastMessage 
-                        ? <span className="text-sm text-gray-600 dark:text-gray-400 max-w-[200px] truncate inline-block">
-                            {typeof topicItem.lastMessage === 'object' 
-                              ? JSON.stringify(topicItem.lastMessage) 
-                              : topicItem.lastMessage}
-                          </span>
-                        : <span className="text-gray-400 dark:text-gray-600">No messages yet</span>
-                      }
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => handleDeleteTopic(topicItem.topic)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                    <Button size="sm" variant="outline" onClick={exportMessages}>
+                      <Download size={14} className="mr-1" />
+                      Exporter
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={clearMessages}>
+                      <Trash2 size={14} className="mr-1" />
+                      Vider
+                    </Button>
+                  </div>
+                </CardTitle>
+                <CardDescription>
+                  {filteredMessages.length} message(s) affiché(s)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Filter size={16} />
+                    <Input 
+                      placeholder="Filtrer par topic ou contenu..."
+                      value={messageFilter}
+                      onChange={(e) => setMessageFilter(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                  
+                  <ScrollArea className="h-96 border rounded-lg">
+                    <div className="p-4 space-y-3">
+                      {filteredMessages.length > 0 ? (
+                        filteredMessages.map((message) => (
+                          <div key={message.id} className="border rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Badge variant="outline">{message.topic}</Badge>
+                              <div className="text-xs text-gray-500">
+                                {new Date(message.timestamp).toLocaleTimeString()}
+                              </div>
+                            </div>
+                            <div className="bg-gray-50 rounded p-2 text-sm font-mono">
+                              {message.payload}
+                            </div>
+                            <div className="flex items-center space-x-2 text-xs text-gray-500">
+                              <span>QoS: {message.qos}</span>
+                              {message.retain && <Badge variant="secondary">Retain</Badge>}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          {isMonitoring ? 'En attente de messages...' : 'Démarrez la surveillance pour voir les messages'}
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Configuration */}
+        <TabsContent value="config">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuration du broker MQTT</CardTitle>
+              <CardDescription>Paramètres de connexion au serveur MQTT</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingConfig ? (
+                <div>Chargement...</div>
+              ) : mqttConfig ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="host">Serveur MQTT</Label>
+                      <Input 
+                        id="host"
+                        value={mqttConfig.host || ''} 
+                        onChange={(e) => queryClient.setQueryData(['/api/mqtt/config'], { ...mqttConfig, host: e.target.value })}
+                        placeholder="localhost ou broker.example.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="port">Port</Label>
+                      <Input 
+                        id="port"
+                        type="number" 
+                        value={mqttConfig.port || ''} 
+                        onChange={(e) => queryClient.setQueryData(['/api/mqtt/config'], { ...mqttConfig, port: parseInt(e.target.value) })}
+                        placeholder="1883"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Nom d'utilisateur</Label>
+                      <Input 
+                        id="username"
+                        value={mqttConfig.username || ''} 
+                        onChange={(e) => queryClient.setQueryData(['/api/mqtt/config'], { ...mqttConfig, username: e.target.value })}
+                        placeholder="Optionnel"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Mot de passe</Label>
+                      <Input 
+                        id="password"
+                        type="password" 
+                        value={mqttConfig.password || ''} 
+                        onChange={(e) => queryClient.setQueryData(['/api/mqtt/config'], { ...mqttConfig, password: e.target.value })}
+                        placeholder="Optionnel"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={handleSaveConfig} className="w-full">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Sauvegarder la configuration
+                  </Button>
+                </div>
               ) : (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-4 text-gray-500 dark:text-gray-400">
-                    No topics configured. Add a topic to start monitoring MQTT messages.
-                  </TableCell>
-                </TableRow>
+                <Alert>
+                  <AlertDescription>
+                    Impossible de charger la configuration MQTT
+                  </AlertDescription>
+                </Alert>
               )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
