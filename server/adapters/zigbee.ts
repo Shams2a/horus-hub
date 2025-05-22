@@ -16,64 +16,16 @@ class MockZigbeeController extends EventEmitter {
     this.devices = new Map();
     this.options = options;
     
-    // Add some mock devices for testing
-    this.devices.set('0x00158d0001d86c3e', {
-      ieeeAddr: '0x00158d0001d86c3e',
-      networkAddress: 0x1234,
-      manufacturerName: 'Philips',
-      modelID: 'Hue Bulb',
-      type: 'Router',
-      interviewCompleted: true,
-      meta: {
-        device: {
-          type: 'light',
-          state: { state: 'ON', brightness: 75 }
-        }
-      }
-    });
+    // Devices will be populated when real Zigbee devices are discovered
     
-    this.devices.set('0x00158d0001f4a123', {
-      ieeeAddr: '0x00158d0001f4a123',
-      networkAddress: 0x2345,
-      manufacturerName: 'Aqara',
-      modelID: 'Motion Sensor',
-      type: 'EndDevice',
-      interviewCompleted: true,
-      meta: {
-        device: {
-          type: 'sensor',
-          state: { motionDetected: false }
-        }
-      }
-    });
-    
-    this.devices.set('0x00158d0002c4578d', {
-      ieeeAddr: '0x00158d0002c4578d',
-      networkAddress: 0x3456,
-      manufacturerName: 'Yale',
-      modelID: 'Smart Lock',
-      type: 'Router',
-      interviewCompleted: true,
-      meta: {
-        device: {
-          type: 'lock',
-          state: { state: 'LOCKED' }
-        }
-      }
-    });
+
   }
 
   async start(): Promise<void> {
     logger.info('Starting mock Zigbee controller', { port: this.options.serialPort });
     this.isStarted = true;
     
-    // Emit a deviceJoined event for each device after a short delay
-    setTimeout(() => {
-      this.devices.forEach((device) => {
-        this.emit('deviceJoined', device);
-        this.emit('deviceInterview', device);
-      });
-    }, 1000);
+    // Real devices will be discovered when connected to actual Zigbee hardware
     
     return Promise.resolve();
   }

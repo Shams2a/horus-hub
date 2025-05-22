@@ -23,28 +23,7 @@ class MockWifiScanner extends EventEmitter {
       lastScan: new Date().toISOString()
     };
 
-    // Add some mock devices for testing
-    this.devices.set('192.168.1.120', {
-      ipAddress: '192.168.1.120',
-      macAddress: 'aa:bb:cc:dd:ee:ff',
-      name: 'Living Room Thermostat',
-      manufacturer: 'Nest',
-      model: 'Learning Thermostat',
-      type: 'thermostat',
-      state: { temperature: 21.5, targetTemperature: 22, mode: 'heat' },
-      online: true
-    });
-    
-    this.devices.set('192.168.1.115', {
-      ipAddress: '192.168.1.115',
-      macAddress: 'ff:ee:dd:cc:bb:aa',
-      name: 'Living Room Speaker',
-      manufacturer: 'Google',
-      model: 'Nest Mini',
-      type: 'speaker',
-      state: { volume: 45, playing: false },
-      online: false
-    });
+    // WiFi devices will be discovered on your real network
   }
 
   async init(): Promise<void> {
