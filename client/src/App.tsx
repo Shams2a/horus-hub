@@ -14,6 +14,7 @@ import Settings from "./pages/Settings";
 import Locations from "./pages/Locations";
 import AdapterManagement from "./pages/AdapterManagement";
 import Updates from "./pages/Updates";
+import Diagnostics from "./pages/Diagnostics";
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
@@ -33,6 +34,7 @@ function App() {
             <Route path="/devices" component={Devices} />
             <Route path="/locations" component={Locations} />
             <Route path="/adapters" component={AdapterManagement} />
+            <Route path="/diagnostics" component={Diagnostics} />
             <Route path="/updates" component={Updates} />
             <Route path="/zigbee" component={Zigbee} />
             <Route path="/wifi" component={Wifi} />

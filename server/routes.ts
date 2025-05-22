@@ -11,6 +11,8 @@ import databaseController from "./controllers/databaseController";
 import adapterManagementController from "./controllers/adapterManagementController";
 import adapterDetectionController from "./controllers/adapterDetectionController";
 import updateController from "./controllers/updateController";
+import { diagnosticController } from "./controllers/diagnosticController";
+import { diagnosticService } from "./services/diagnosticService";
 import { AdapterManager } from "./adapters/AdapterManager";
 import { setupZigbeeAdapter } from "./adapters/zigbee";
 import { setupWifiAdapter } from "./adapters/wifi";
@@ -191,6 +193,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/updates/history', updateController.getUpdateHistory);
   app.post('/api/updates/cancel', updateController.cancelUpdate);
   app.post('/api/updates/test-compatibility', updateController.testCompatibility);
+
+  // Diagnostic routes
+  app.get('/api/diagnostics/health', diagnosticController.getSystemHealth);
+  app.get('/api/diagnostics/errors', diagnosticController.getErrors);
+  app.get('/api/diagnostics/errors/:errorId', diagnosticController.getError);
+  app.post('/api/diagnostics/errors/:errorId/resolve', diagnosticController.resolveError);
+  app.get('/api/diagnostics/checks', diagnosticController.getChecks);
+  app.put('/api/diagnostics/checks/:checkId', diagnosticController.updateCheck);
+  app.post('/api/diagnostics/checks/:checkId/run', diagnosticController.runCheck);
+  app.get('/api/diagnostics/stats', diagnosticController.getErrorStats);
+  app.get('/api/diagnostics/export', diagnosticController.exportDiagnosticLogs);
+  app.post('/api/diagnostics/simulate', diagnosticController.simulateError);
 
   return httpServer;
 }

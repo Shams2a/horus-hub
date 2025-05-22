@@ -11,7 +11,8 @@ import {
   HardDrive,
   Map,
   Building2,
-  Download
+  Download,
+  Shield
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 
@@ -110,6 +111,20 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
             >
               <Settings className="h-5 w-5 mr-3" />
               <span>Adaptateurs</span>
+            </Link>
+          </li>
+          <li>
+            <Link 
+              href="/diagnostics" 
+              onClick={closeSidebarOnMobile}
+              className={`flex items-center p-2 rounded-md transition-colors duration-200 ${
+                isActive('/diagnostics') 
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground' 
+                  : 'text-sidebar-foreground hover:bg-sidebar-border'
+              }`}
+            >
+              <Shield className="h-5 w-5 mr-3" />
+              <span>Diagnostic</span>
             </Link>
           </li>
 
