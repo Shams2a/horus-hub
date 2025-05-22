@@ -489,27 +489,11 @@ export class DiagnosticService extends EventEmitter {
   }
 
   private getAdapterHealth(activeErrors: DiagnosticError[]) {
+    // Ne retourner aucun adaptateur fictif - seulement les vrais adaptateurs connectés
     const adapters: SystemHealth['adapters'] = {};
-    const adapterNames = ['zigbee', 'wifi', 'mqtt'];
     
-    for (const name of adapterNames) {
-      const adapterErrors = activeErrors.filter(e => e.source.includes(name));
-      const criticalErrors = adapterErrors.filter(e => e.severity === 'critical');
-      const highErrors = adapterErrors.filter(e => e.severity === 'high');
-      
-      let status: 'healthy' | 'warning' | 'critical' | 'offline' = 'healthy';
-      if (criticalErrors.length > 0) {
-        status = 'critical';
-      } else if (highErrors.length > 0) {
-        status = 'warning';
-      }
-      
-      adapters[name] = {
-        status,
-        lastCheck: new Date(),
-        issues: adapterErrors
-      };
-    }
+    // Les adaptateurs ne s'afficheront que s'ils sont réellement connectés
+    // et génèrent de vraies erreurs ou de vrais statuts
     
     return adapters;
   }
