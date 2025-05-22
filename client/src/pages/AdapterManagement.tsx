@@ -189,6 +189,25 @@ const AdapterManagement = () => {
     }
   });
 
+  // Charger les configurations détectées automatiquement
+  const { data: detectedZigbeeConfig } = useQuery({
+    queryKey: ['/api/adapters/detected-config/zigbee'],
+    queryFn: async () => {
+      const response = await fetch('/api/adapters/detected-config/zigbee');
+      if (!response.ok) return null;
+      return response.json();
+    }
+  });
+
+  const { data: detectedWifiConfig } = useQuery({
+    queryKey: ['/api/adapters/detected-config/wifi'],
+    queryFn: async () => {
+      const response = await fetch('/api/adapters/detected-config/wifi');
+      if (!response.ok) return null;
+      return response.json();
+    }
+  });
+
   // Lancer la détection automatique
   const runDetection = async () => {
     setIsDetecting(true);
@@ -620,13 +639,33 @@ const AdapterManagement = () => {
               <CardContent>
                 {zigbeeStatus ? (
                   <div className="space-y-4">
+                    {/* Affichage des configurations détectées */}
+                    {detectedZigbeeConfig?.found && (
+                      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <h4 className="font-semibold text-green-800 dark:text-green-200">
+                            Configuration détectée automatiquement
+                          </h4>
+                        </div>
+                        <p className="text-sm text-green-700 dark:text-green-300 mb-2">
+                          Adaptateur: {detectedZigbeeConfig.config.adapter?.model} 
+                          ({detectedZigbeeConfig.config.adapter?.manufacturer})
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-400">
+                          Détecté le {new Date(detectedZigbeeConfig.config.detectedAt).toLocaleString()} 
+                          - Confiance: {detectedZigbeeConfig.confidence}
+                        </p>
+                      </div>
+                    )}
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Port série</label>
                         <input 
                           type="text" 
                           className="w-full p-2 border rounded-md"
-                          defaultValue="/dev/ttyUSB0"
+                          defaultValue={detectedZigbeeConfig?.config?.zigbee?.serialPort || "/dev/ttyUSB0"}
                           placeholder="/dev/ttyUSB0"
                         />
                       </div>
