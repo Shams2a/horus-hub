@@ -84,14 +84,14 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">MQTT Broker</p>
-                  <p className="text-xl font-semibold mt-1">Connected</p>
+                  <p className="text-xl font-semibold mt-1">Non configuré</p>
                 </div>
-                <div className="p-3 rounded-full bg-success bg-opacity-20">
-                  <Cloud className="h-6 w-6 text-success" />
+                <div className="p-3 rounded-full bg-gray-200 dark:bg-gray-700">
+                  <Cloud className="h-6 w-6 text-gray-500" />
                 </div>
               </div>
               <div className="mt-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Last message: 2s ago</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Configurer un broker pour commencer</p>
               </div>
             </CardContent>
           </Card>

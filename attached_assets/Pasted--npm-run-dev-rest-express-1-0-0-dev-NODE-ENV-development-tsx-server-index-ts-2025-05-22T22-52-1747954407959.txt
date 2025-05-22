@@ -1,0 +1,122 @@
+ npm run dev
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[2025-05-22T22:52:30.583Z] [INFO] Database connection initialized successfully
+[2025-05-22T22:52:30.590Z] [INFO] AdapterManager initialized
+[2025-05-22T22:52:30.677Z] [INFO] Setting up Zigbee adapter
+[2025-05-22T22:52:30.678Z] [INFO] Registered zigbee adapter
+[2025-05-22T22:52:30.679Z] [INFO] Starting Zigbee adapter
+[2025-05-22T22:52:30.679Z] [INFO] Starting mock Zigbee controller {"port":"/dev/ttyUSB0"}
+[2025-05-22T22:52:30.680Z] [INFO] Zigbee adapter started successfully
+[2025-05-22T22:52:30.681Z] [INFO] Setting up WiFi adapter
+[2025-05-22T22:52:30.682Z] [INFO] Registered wifi adapter
+[2025-05-22T22:52:30.683Z] [INFO] Starting WiFi adapter
+[2025-05-22T22:52:30.684Z] [INFO] Initializing WiFi scanner
+[2025-05-22T22:52:30.684Z] [INFO] Started periodic WiFi scanning every 1800 seconds
+[2025-05-22T22:52:30.685Z] [INFO] Scanning for WiFi devices
+[2025-05-22T22:52:30.686Z] [INFO] WiFi scan completed {"deviceCount":0}
+[2025-05-22T22:52:30.686Z] [INFO] WiFi adapter started successfully
+[2025-05-22T22:52:30.686Z] [INFO] Setting up MQTT adapter
+[2025-05-22T22:52:30.687Z] [INFO] Registered mqtt adapter
+[2025-05-22T22:52:30.687Z] [INFO] Starting MQTT adapter
+[2025-05-22T22:52:30.688Z] [INFO] Connecting to MQTT broker {}
+[2025-05-22T22:52:30.689Z] [INFO] MQTT adapter started successfully
+[2025-05-22T22:52:30.690Z] [ERROR] Failed to load stored topics {"error":{}}
+[2025-05-22T22:52:30.690Z] [INFO] All adapters initialized
+12:52:30 AM [express] serving on port 5000
+[2025-05-22T22:52:32.088Z] [INFO] Connected to MQTT broker
+[2025-05-22T22:52:32.088Z] [INFO] Connected to MQTT broker
+🔍 Vérification des mises à jour des bibliothèques IoT...
+⚠️ Impossible d'obtenir les infos de zigbee-herdsman: Error: Command failed: npm list zigbee-herdsman --depth=0 --json
+
+    at genericNodeError (node:internal/errors:984:15)
+    at wrappedFn (node:internal/errors:538:14)
+    at ChildProcess.exithandler (node:child_process:422:12)
+    at ChildProcess.emit (node:events:519:28)
+    at maybeClose (node:internal/child_process:1105:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+  code: 1,
+  killed: false,
+  signal: null,
+  cmd: 'npm list zigbee-herdsman --depth=0 --json',
+  stdout: '{\n  "version": "1.0.0",\n  "name": "rest-express"\n}\n',
+  stderr: ''
+}
+⚠️ Impossible d'obtenir les infos de zigbee-herdsman-converters: Error: Command failed: npm list zigbee-herdsman-converters --depth=0 --json
+
+    at genericNodeError (node:internal/errors:984:15)
+    at wrappedFn (node:internal/errors:538:14)
+    at ChildProcess.exithandler (node:child_process:422:12)
+    at ChildProcess.emit (node:events:519:28)
+    at maybeClose (node:internal/child_process:1105:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+  code: 1,
+  killed: false,
+  signal: null,
+  cmd: 'npm list zigbee-herdsman-converters --depth=0 --json',
+  stdout: '{\n  "version": "1.0.0",\n  "name": "rest-express"\n}\n',
+  stderr: ''
+}
+⚠️ Impossible d'obtenir les infos de zigbee2mqtt: Error: Command failed: npm list zigbee2mqtt --depth=0 --json
+
+    at genericNodeError (node:internal/errors:984:15)
+    at wrappedFn (node:internal/errors:538:14)
+    at ChildProcess.exithandler (node:child_process:422:12)
+    at ChildProcess.emit (node:events:519:28)
+    at maybeClose (node:internal/child_process:1105:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+  code: 1,
+  killed: false,
+  signal: null,
+  cmd: 'npm list zigbee2mqtt --depth=0 --json',
+  stdout: '{\n  "version": "1.0.0",\n  "name": "rest-express"\n}\n',
+  stderr: ''
+}
+⚠️ Impossible d'obtenir les infos de node-hid: Error: Command failed: npm list node-hid --depth=0 --json
+
+    at genericNodeError (node:internal/errors:984:15)
+    at wrappedFn (node:internal/errors:538:14)
+    at ChildProcess.exithandler (node:child_process:422:12)
+    at ChildProcess.emit (node:events:519:28)
+    at maybeClose (node:internal/child_process:1105:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+  code: 1,
+  killed: false,
+  signal: null,
+  cmd: 'npm list node-hid --depth=0 --json',
+  stdout: '{\n  "version": "1.0.0",\n  "name": "rest-express"\n}\n',
+  stderr: ''
+}
+⚠️ Impossible d'obtenir les infos de serialport: Error: Command failed: npm list serialport --depth=0 --json
+
+    at genericNodeError (node:internal/errors:984:15)
+    at wrappedFn (node:internal/errors:538:14)
+    at ChildProcess.exithandler (node:child_process:422:12)
+    at ChildProcess.emit (node:events:519:28)
+    at maybeClose (node:internal/child_process:1105:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+  code: 1,
+  killed: false,
+  signal: null,
+  cmd: 'npm list serialport --depth=0 --json',
+  stdout: '{\n  "version": "1.0.0",\n  "name": "rest-express"\n}\n',
+  stderr: ''
+}
+⚠️ Impossible d'obtenir les infos de @homebridge/hap-nodejs: Error: Command failed: npm list @homebridge/hap-nodejs --depth=0 --json
+
+    at genericNodeError (node:internal/errors:984:15)
+    at wrappedFn (node:internal/errors:538:14)
+    at ChildProcess.exithandler (node:child_process:422:12)
+    at ChildProcess.emit (node:events:519:28)
+    at maybeClose (node:internal/child_process:1105:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+  code: 1,
+  killed: false,
+  signal: null,
+  cmd: 'npm list @homebridge/hap-nodejs --depth=0 --json',
+  stdout: '{\n  "version": "1.0.0",\n  "name": "rest-express"\n}\n',
+  stderr: ''
+}
+

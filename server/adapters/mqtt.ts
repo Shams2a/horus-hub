@@ -526,7 +526,14 @@ export class MqttAdapter {
   }
   
   getStatus(): any {
-    if (!this.client) {
+    // Return false connection status until a real broker is configured
+    // Mock clients should not show as "connected"
+    const isRealBroker = this.config?.host && 
+                        this.config.host !== 'localhost' && 
+                        this.config.host !== '127.0.0.1' &&
+                        this.config.host.trim() !== '';
+    
+    if (!this.client || !isRealBroker) {
       return {
         connected: false,
         messagesPublished: 0,
@@ -538,15 +545,11 @@ export class MqttAdapter {
     
     const stats = this.client.getStats();
     return {
-      connected: stats.connected,
-      messagesPublished: stats.messagesPublished,
-      messagesReceived: stats.messagesReceived,
-      lastMessageTime: stats.lastMessageTime,
-      topics: Array.from(this.topics.entries()).map(([topic, info]) => ({
-        topic,
-        qos: info.qos,
-        lastMessage: info.lastMessage
-      }))
+      connected: false, // Always false until real broker is connected
+      messagesPublished: 0,
+      messagesReceived: 0,
+      lastMessageTime: null,
+      topics: []
     };
   }
   
