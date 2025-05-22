@@ -152,7 +152,7 @@ export default function AddDeviceModal({ isOpen, onClose }: AddDeviceModalProps)
                   <SelectValue placeholder="Select room" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="living-room">Living Room</SelectItem>
+                  <SelectItem value="main-room">Pièce principale</SelectItem>
                   <SelectItem value="kitchen">Kitchen</SelectItem>
                   <SelectItem value="bedroom">Bedroom</SelectItem>
                   <SelectItem value="bathroom">Bathroom</SelectItem>

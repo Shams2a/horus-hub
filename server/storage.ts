@@ -127,7 +127,7 @@ export class MemStorage implements IStorage {
     this.insertSetting({
       key: 'network',
       value: {
-        ipAddress: '192.168.1.105',
+        ipAddress: '',
         networkMode: 'DHCP',
         hostname: 'horushub'
       },

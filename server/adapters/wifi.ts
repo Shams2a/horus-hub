@@ -16,10 +16,10 @@ class MockWifiScanner extends EventEmitter {
     super();
     this.devices = new Map();
     this.networkInfo = {
-      networkName: 'HorusHubNetwork',
-      ipAddress: '192.168.1.105',
-      macAddress: '00:0a:95:9d:68:16',
-      signalStrength: 'excellent',
+      networkName: '',
+      ipAddress: '',
+      macAddress: '',
+      signalStrength: 'unknown',
       lastScan: new Date().toISOString()
     };
 
