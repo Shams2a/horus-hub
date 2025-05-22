@@ -62,17 +62,15 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Zigbee Adapter</p>
-                  <p className="text-xl font-semibold mt-1">Connected</p>
+                  <p className="text-xl font-semibold mt-1">Non détecté</p>
                 </div>
-                <div className="p-3 rounded-full bg-success bg-opacity-20">
-                  <Wifi className="h-6 w-6 text-success" />
+                <div className="p-3 rounded-full bg-gray-200 dark:bg-gray-700">
+                  <Wifi className="h-6 w-6 text-gray-500" />
                 </div>
               </div>
               <div className="mt-4">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {loadingDevices
-                    ? 'Loading devices...'
-                    : `${devices?.filter(d => d.protocol === 'zigbee').length || 0} devices connected`}
+                  Connectez un adaptateur Zigbee pour commencer
                 </p>
               </div>
             </CardContent>
