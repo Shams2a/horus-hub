@@ -8,6 +8,7 @@ import settingsController from "./controllers/settingsController";
 import logController from "./controllers/logController";
 import locationController from "./controllers/locationController";
 import databaseController from "./controllers/databaseController";
+import adapterManagementController from "./controllers/adapterManagementController";
 import { AdapterManager } from "./adapters/AdapterManager";
 import { setupZigbeeAdapter } from "./adapters/zigbee";
 import { setupWifiAdapter } from "./adapters/wifi";
@@ -165,6 +166,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/database/config', databaseController.updateDatabaseConfig);
   app.post('/api/database/test', databaseController.testDatabaseConnection);
   app.post('/api/database/sync', databaseController.syncDatabases);
+  
+  // Adapter management routes
+  app.get('/api/adapters/status', adapterManagementController.getAdapterStatus);
+  app.post('/api/adapters/:protocol/restart', adapterManagementController.restartAdapter);
+  app.post('/api/adapters/:protocol/test', adapterManagementController.testAdapter);
+  app.post('/api/adapters/:protocol/reset', adapterManagementController.resetAdapter);
+  app.post('/api/adapters/:protocol/diagnostics', adapterManagementController.runDiagnostics);
 
   return httpServer;
 }

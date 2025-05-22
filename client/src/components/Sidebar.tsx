@@ -99,6 +99,20 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
           </li>
           <li>
             <Link 
+              href="/adapters" 
+              onClick={closeSidebarOnMobile}
+              className={`flex items-center p-2 rounded-md transition-colors duration-200 ${
+                isActive('/adapters') 
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground' 
+                  : 'text-sidebar-foreground hover:bg-sidebar-border'
+              }`}
+            >
+              <Settings className="h-5 w-5 mr-3" />
+              <span>Adaptateurs</span>
+            </Link>
+          </li>
+          <li>
+            <Link 
               href="/zigbee" 
               onClick={closeSidebarOnMobile}
               className={`flex items-center p-2 rounded-md transition-colors duration-200 ${
