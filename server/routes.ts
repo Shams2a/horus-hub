@@ -8,7 +8,7 @@ import settingsController from "./controllers/settingsController";
 import logController from "./controllers/logController";
 import locationController from "./controllers/locationController";
 import databaseController from "./controllers/databaseController";
-import adapterManagementController from "./controllers/adapterManagementController";
+import adapterManagementController, { setAdapterManager } from "./controllers/adapterManagementController";
 import adapterDetectionController from "./controllers/adapterDetectionController";
 import updateController from "./controllers/updateController";
 import { diagnosticController } from "./controllers/diagnosticController";

@@ -1,6 +1,14 @@
 import { Request, Response } from 'express';
 import logger from '../utils/logger';
 
+// Variable pour stocker l'instance d'AdapterManager
+let globalAdapterManager: any = null;
+
+// Fonction pour définir l'instance d'AdapterManager
+export const setAdapterManager = (manager: any) => {
+  globalAdapterManager = manager;
+};
+
 // Contrôleur pour les actions de gestion des adaptateurs
 const restartAdapter = async (req: Request, res: Response) => {
   try {
@@ -8,27 +16,32 @@ const restartAdapter = async (req: Request, res: Response) => {
     
     logger.info(`Restarting ${protocol} adapter`);
     
-    // Simuler le redémarrage de l'adaptateur
-    // Dans une vraie implémentation, ceci interagirait avec l'AdapterManager
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Obtenir l'adaptateur réel
+    const adapter = globalAdapterManager?.getAdapter(protocol);
+    if (!adapter) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Adaptateur ${protocol} non trouvé` 
+      });
+    }
     
-    // Log de l'activité
-    const activityData = {
-      entityId: 0,
-      activity: 'adapter_restarted',
-      details: {
-        protocol: protocol
-      },
-      timestamp: new Date()
-    };
+    // Redémarrer l'adaptateur réel
+    await adapter.stop();
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Petite pause
+    await adapter.start();
+    
+    logger.info(`Adapter ${protocol} restarted successfully`);
     
     res.json({ 
       success: true, 
       message: `Adaptateur ${protocol} redémarré avec succès` 
     });
-  } catch (error) {
-    logger.error('Error restarting adapter', { protocol: req.params.protocol, error });
-    res.status(500).json({ error: 'Impossible de redémarrer l\'adaptateur' });
+  } catch (error: any) {
+    logger.error('Error restarting adapter', { protocol: req.params.protocol, error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: `Impossible de redémarrer l'adaptateur: ${error.message}` 
+    });
   }
 };
 
