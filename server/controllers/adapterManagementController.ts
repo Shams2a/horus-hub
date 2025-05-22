@@ -120,33 +120,11 @@ const resetAdapter = async (req: Request, res: Response) => {
 
 const getAdapterStatus = async (req: Request, res: Response) => {
   try {
-    // Retourner un statut consolidé de tous les adaptateurs
-    const status = {
-      zigbee: {
-        connected: true,
-        uptime: '2h 30m',
-        messagesReceived: 145,
-        messagesPublished: 67,
-        errors: 0,
-        lastActivity: 'Il y a 2 minutes'
-      },
-      wifi: {
-        connected: true,
-        uptime: '2h 30m',
-        devicesScanned: 23,
-        commandsSent: 12,
-        errors: 1,
-        lastScan: 'Il y a 30 secondes'
-      },
-      mqtt: {
-        connected: true,
-        uptime: '2h 30m',
-        messagesReceived: 89,
-        messagesPublished: 156,
-        errors: 0,
-        lastMessage: 'Il y a 5 secondes'
-      }
-    };
+    // Récupérer le statut réel des adaptateurs depuis leurs APIs respectives
+    const status = {};
+    
+    // Note: Retourner un objet vide pour l'instant
+    // Les vrais adaptateurs seront détectés via leurs APIs individuelles
     
     res.json(status);
   } catch (error) {

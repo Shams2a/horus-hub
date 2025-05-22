@@ -50,77 +50,103 @@ const AdapterManagement = () => {
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Charger le statut de tous les adaptateurs
+  // Charger le statut des adaptateurs réels uniquement
   const { data: adapters = [], isLoading, refetch } = useQuery({
-    queryKey: ['/api/adapters/status'],
+    queryKey: ['/api/adapters/real-status'],
     queryFn: async () => {
-      // Récupérer les statuts de tous les adaptateurs
-      const zigbeeStatus = await fetch('/api/zigbee/status').then(r => r.json());
-      const wifiStatus = await fetch('/api/wifi/status').then(r => r.json());
-      const mqttStatus = await fetch('/api/mqtt/status').then(r => r.json());
-
-      return [
-        {
-          protocol: 'zigbee',
-          name: 'Adaptateur Zigbee',
-          icon: Zap,
-          connected: zigbeeStatus.connected,
-          status: zigbeeStatus.connected ? 'online' : 'offline',
-          statistics: {
-            messagesReceived: zigbeeStatus.messagesReceived || 0,
-            messagesPublished: zigbeeStatus.messagesPublished || 0,
-            errors: zigbeeStatus.errors || 0,
-            uptime: zigbeeStatus.uptime || '0s',
-            lastActivity: zigbeeStatus.lastActivity || 'Jamais'
-          },
-          config: zigbeeStatus,
-          diagnostics: {
-            health: zigbeeStatus.connected ? 'good' : 'error',
-            issues: zigbeeStatus.connected ? [] : ['Adaptateur déconnecté'],
-            suggestions: zigbeeStatus.connected ? [] : ['Vérifiez la connexion USB', 'Redémarrez l\'adaptateur']
-          }
-        },
-        {
-          protocol: 'wifi',
-          name: 'Adaptateur WiFi',
-          icon: Wifi,
-          connected: wifiStatus.connected,
-          status: wifiStatus.connected ? 'online' : 'offline',
-          statistics: {
-            messagesReceived: wifiStatus.devicesScanned || 0,
-            messagesPublished: wifiStatus.commandsSent || 0,
-            errors: wifiStatus.errors || 0,
-            uptime: wifiStatus.uptime || '0s',
-            lastActivity: wifiStatus.lastScan || 'Jamais'
-          },
-          config: wifiStatus,
-          diagnostics: {
-            health: wifiStatus.connected ? 'good' : 'warning',
-            issues: wifiStatus.connected ? [] : ['Scanner WiFi inactif'],
-            suggestions: wifiStatus.connected ? [] : ['Vérifiez la connectivité réseau']
-          }
-        },
-        {
-          protocol: 'mqtt',
-          name: 'Broker MQTT',
-          icon: Cloud,
-          connected: mqttStatus.connected,
-          status: mqttStatus.connected ? 'online' : 'offline',
-          statistics: {
-            messagesReceived: mqttStatus.messagesReceived || 0,
-            messagesPublished: mqttStatus.messagesPublished || 0,
-            errors: mqttStatus.errors || 0,
-            uptime: mqttStatus.uptime || '0s',
-            lastActivity: mqttStatus.lastMessage || 'Jamais'
-          },
-          config: mqttStatus,
-          diagnostics: {
-            health: mqttStatus.connected ? 'good' : 'error',
-            issues: mqttStatus.connected ? [] : ['Connexion MQTT fermée'],
-            suggestions: mqttStatus.connected ? [] : ['Vérifiez les paramètres MQTT', 'Testez la connectivité']
-          }
+      const adaptersFound = [];
+      
+      // Tenter de récupérer le statut Zigbee
+      try {
+        const zigbeeResponse = await fetch('/api/zigbee/status');
+        if (zigbeeResponse.ok) {
+          const zigbeeStatus = await zigbeeResponse.json();
+          adaptersFound.push({
+            protocol: 'zigbee',
+            name: 'Adaptateur Zigbee',
+            icon: Zap,
+            connected: zigbeeStatus.connected || false,
+            status: zigbeeStatus.connected ? 'online' : 'offline',
+            statistics: {
+              messagesReceived: zigbeeStatus.messagesReceived || 0,
+              messagesPublished: zigbeeStatus.messagesPublished || 0,
+              errors: zigbeeStatus.errors || 0,
+              uptime: zigbeeStatus.uptime || 'N/A',
+              lastActivity: zigbeeStatus.lastActivity || 'Jamais'
+            },
+            config: zigbeeStatus,
+            diagnostics: {
+              health: zigbeeStatus.connected ? 'good' : 'error',
+              issues: zigbeeStatus.connected ? [] : ['Adaptateur Zigbee déconnecté'],
+              suggestions: zigbeeStatus.connected ? [] : ['Vérifiez la connexion USB de l\'adaptateur Zigbee']
+            }
+          });
         }
-      ];
+      } catch (error) {
+        console.log('Adaptateur Zigbee non détecté');
+      }
+
+      // Tenter de récupérer le statut WiFi
+      try {
+        const wifiResponse = await fetch('/api/wifi/status');
+        if (wifiResponse.ok) {
+          const wifiStatus = await wifiResponse.json();
+          adaptersFound.push({
+            protocol: 'wifi',
+            name: 'Adaptateur WiFi',
+            icon: Wifi,
+            connected: wifiStatus.connected || false,
+            status: wifiStatus.connected ? 'online' : 'offline',
+            statistics: {
+              messagesReceived: wifiStatus.devicesScanned || 0,
+              messagesPublished: wifiStatus.commandsSent || 0,
+              errors: wifiStatus.errors || 0,
+              uptime: wifiStatus.uptime || 'N/A',
+              lastActivity: wifiStatus.lastScan || 'Jamais'
+            },
+            config: wifiStatus,
+            diagnostics: {
+              health: wifiStatus.connected ? 'good' : 'warning',
+              issues: wifiStatus.connected ? [] : ['Scanner WiFi inactif'],
+              suggestions: wifiStatus.connected ? [] : ['Vérifiez la connectivité réseau WiFi']
+            }
+          });
+        }
+      } catch (error) {
+        console.log('Adaptateur WiFi non détecté');
+      }
+
+      // Tenter de récupérer le statut MQTT
+      try {
+        const mqttResponse = await fetch('/api/mqtt/status');
+        if (mqttResponse.ok) {
+          const mqttStatus = await mqttResponse.json();
+          adaptersFound.push({
+            protocol: 'mqtt',
+            name: 'Broker MQTT',
+            icon: Cloud,
+            connected: mqttStatus.connected || false,
+            status: mqttStatus.connected ? 'online' : 'offline',
+            statistics: {
+              messagesReceived: mqttStatus.messagesReceived || 0,
+              messagesPublished: mqttStatus.messagesPublished || 0,
+              errors: mqttStatus.errors || 0,
+              uptime: mqttStatus.uptime || 'N/A',
+              lastActivity: mqttStatus.lastMessage || 'Jamais'
+            },
+            config: mqttStatus,
+            diagnostics: {
+              health: mqttStatus.connected ? 'good' : 'error',
+              issues: mqttStatus.connected ? [] : ['Connexion MQTT fermée'],
+              suggestions: mqttStatus.connected ? [] : ['Vérifiez les paramètres de connexion MQTT']
+            }
+          });
+        }
+      } catch (error) {
+        console.log('Broker MQTT non détecté');
+      }
+
+      return adaptersFound;
     },
     refetchInterval: 5000, // Actualiser toutes les 5 secondes
   });
