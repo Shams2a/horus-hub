@@ -219,18 +219,52 @@ export default function Mqtt() {
     if (!mqttConfig) return;
 
     try {
+      // Sauvegarder la configuration
       await apiRequest('PUT', '/api/mqtt/config', mqttConfig);
       
       toast({
         title: 'Configuration sauvegardée',
-        description: 'Les paramètres MQTT ont été mis à jour',
+        description: 'Les paramètres MQTT ont été mis à jour. Reconnexion en cours...',
       });
       
-      refetchStatus();
+      // Forcer une reconnexion en redémarrant l'adaptateur
+      await apiRequest('POST', '/api/adapters/mqtt/restart', {});
+      
+      // Attendre un peu puis rafraîchir le statut
+      setTimeout(() => {
+        refetchStatus();
+        refetchConfig();
+      }, 2000);
+      
     } catch (error) {
       toast({
         title: 'Erreur de sauvegarde',
         description: error instanceof Error ? error.message : 'Impossible de sauvegarder la configuration',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleTestConnection = async () => {
+    try {
+      const result = await apiRequest('POST', '/api/mqtt/test', {});
+      
+      if (result.success) {
+        toast({
+          title: 'Test réussi',
+          description: 'La connexion MQTT fonctionne correctement',
+        });
+      } else {
+        toast({
+          title: 'Test échoué',
+          description: 'Impossible de se connecter au broker MQTT',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Erreur de test',
+        description: error instanceof Error ? error.message : 'Erreur lors du test de connexion',
         variant: 'destructive',
       });
     }
@@ -620,10 +654,26 @@ export default function Mqtt() {
                       />
                     </div>
                   </div>
-                  <Button onClick={handleSaveConfig} className="w-full">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Sauvegarder la configuration
-                  </Button>
+                  <div className="space-y-2">
+                    <Button onClick={handleSaveConfig} className="w-full">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Sauvegarder la configuration
+                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button onClick={handleTestConnection} variant="outline" className="w-full">
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Tester la connexion
+                      </Button>
+                      <Button 
+                        onClick={() => apiRequest('POST', '/api/adapters/mqtt/restart', {})} 
+                        variant="outline" 
+                        className="w-full"
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        Reconnecter
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <Alert>
