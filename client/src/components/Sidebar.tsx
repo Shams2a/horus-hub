@@ -35,7 +35,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
     <aside 
       className={`w-64 bg-sidebar fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${
         open ? 'translate-x-0' : '-translate-x-full'
-      } flex flex-col h-screen`}
+      } flex flex-col h-full`}
       style={{ backgroundColor: 'hsl(var(--sidebar-background))' }}
     >
       {/* Logo Section */}
