@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AdapterDetectionService } from '../services/adapterDetectionService';
 import { KNOWN_ZIGBEE_ADAPTERS, getRecommendedAdapters, findAdaptersByManufacturer } from '../data/adapterDatabase';
 import logger from '../utils/logger';
+import { storage } from '../storage';
 
 const detectionService = new AdapterDetectionService();
 
@@ -222,10 +223,41 @@ const getAdapterStatistics = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Récupère la configuration détectée pour un protocole
+ */
+const getDetectedConfig = async (req: Request, res: Response) => {
+  try {
+    const { protocol } = req.params;
+    const configKey = `detected_${protocol}_config`;
+    
+    const setting = await storage.getSetting(configKey);
+    
+    if (setting) {
+      const config = JSON.parse(setting.value as string);
+      res.json({
+        found: true,
+        config: config,
+        detectedAt: config.detectedAt,
+        confidence: config.confidence
+      });
+    } else {
+      res.json({
+        found: false,
+        message: `Aucune configuration détectée pour ${protocol}`
+      });
+    }
+  } catch (error) {
+    logger.error('Erreur lors de la récupération de la configuration détectée', { protocol: req.params.protocol, error });
+    res.status(500).json({ error: 'Impossible de récupérer la configuration détectée' });
+  }
+};
+
 export default {
   detectAdapters,
   getKnownAdapters,
   getRecommendedAdaptersList,
   getAdapterDetails,
-  getAdapterStatistics
+  getAdapterStatistics,
+  getDetectedConfig
 };

@@ -188,6 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/adapters/recommended', adapterDetectionController.getRecommendedAdaptersList);
   app.get('/api/adapters/details/:vid/:pid', adapterDetectionController.getAdapterDetails);
   app.get('/api/adapters/statistics', adapterDetectionController.getAdapterStatistics);
+  app.get('/api/adapters/detected-config/:protocol', adapterDetectionController.getDetectedConfig);
 
   // MQTT routes
   app.get('/api/mqtt/status', (req, res) => {

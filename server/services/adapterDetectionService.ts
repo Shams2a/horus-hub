@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { findAdapterByUSBId, AdapterInfo, getRecommendedAdapters } from '../data/adapterDatabase';
 import logger from '../utils/logger';
+import { storage } from '../storage';
 
 const execAsync = promisify(exec);
 
@@ -50,7 +51,88 @@ export class AdapterDetectionService {
       results.push(...heuristicResults);
     }
     
+    // Sauvegarder automatiquement les configurations recommandées
+    await this.saveDetectedConfigurations(results);
+    
     return results;
+  }
+
+  /**
+   * Sauvegarde les configurations recommandées dans les settings
+   */
+  private async saveDetectedConfigurations(results: DetectionResult[]): Promise<void> {
+    try {
+      for (const result of results) {
+        if (result.adapter && result.confidence === 'high') {
+          await this.saveAdapterConfiguration(result);
+        }
+      }
+    } catch (error) {
+      logger.error('Error saving detected configurations', { error });
+    }
+  }
+
+  /**
+   * Sauvegarde la configuration d'un adaptateur détecté
+   */
+  private async saveAdapterConfiguration(result: DetectionResult): Promise<void> {
+    if (!result.adapter) return;
+
+    const protocol = this.getProtocolFromAdapter(result.adapter);
+    if (!protocol) return;
+
+    const configKey = `detected_${protocol}_config`;
+    const configuration = this.generateConfiguration(result);
+
+    try {
+      await storage.updateSetting(configKey, JSON.stringify(configuration));
+      logger.info(`Saved detected configuration for ${protocol}`, { configuration });
+    } catch (error) {
+      logger.error(`Error saving configuration for ${protocol}`, { error });
+    }
+  }
+
+  /**
+   * Génère la configuration recommandée pour un adaptateur
+   */
+  private generateConfiguration(result: DetectionResult): any {
+    if (!result.adapter) return {};
+
+    const config: any = {
+      detectedAt: new Date().toISOString(),
+      confidence: result.confidence,
+      adapter: result.adapter,
+      devicePath: result.devicePath || '/dev/ttyUSB0',
+      suggestions: result.suggestions,
+      issues: result.issues
+    };
+
+    // Configuration spécifique selon le type d'adaptateur
+    if (result.adapter.chipset.includes('CC2531') || result.adapter.chipset.includes('CC2652')) {
+      config.zigbee = {
+        serialPort: result.devicePath || '/dev/ttyUSB0',
+        baudRate: 115200,
+        coordinator: 'zStack',
+        panId: '0x1a62',
+        channel: 11,
+        networkKey: 'GENERATE_NEW_KEY'
+      };
+    }
+
+    return config;
+  }
+
+  /**
+   * Détermine le protocole depuis les informations de l'adaptateur
+   */
+  private getProtocolFromAdapter(adapter: AdapterInfo): string | null {
+    // La plupart des adaptateurs détectés sont Zigbee
+    if (adapter.chipset.includes('CC') || adapter.chipset.includes('EFR32')) {
+      return 'zigbee';
+    }
+    
+    // Ajouter d'autres types si nécessaire
+    return 'zigbee'; // Par défaut pour les adaptateurs connus
   }
   
   /**
