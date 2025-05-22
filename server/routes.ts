@@ -10,6 +10,7 @@ import locationController from "./controllers/locationController";
 import databaseController from "./controllers/databaseController";
 import adapterManagementController from "./controllers/adapterManagementController";
 import adapterDetectionController from "./controllers/adapterDetectionController";
+import updateController from "./controllers/updateController";
 import { AdapterManager } from "./adapters/AdapterManager";
 import { setupZigbeeAdapter } from "./adapters/zigbee";
 import { setupWifiAdapter } from "./adapters/wifi";
@@ -181,6 +182,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/adapters/recommended', adapterDetectionController.getRecommendedAdaptersList);
   app.get('/api/adapters/details/:vid/:pid', adapterDetectionController.getAdapterDetails);
   app.get('/api/adapters/statistics', adapterDetectionController.getAdapterStatistics);
+  
+  // Library update routes
+  app.get('/api/updates/available', updateController.getAvailableUpdates);
+  app.post('/api/updates/check', updateController.checkUpdates);
+  app.post('/api/updates/library/:library', updateController.updateLibrary);
+  app.get('/api/updates/status', updateController.getUpdateStatus);
+  app.get('/api/updates/history', updateController.getUpdateHistory);
+  app.post('/api/updates/cancel', updateController.cancelUpdate);
+  app.post('/api/updates/test-compatibility', updateController.testCompatibility);
 
   return httpServer;
 }
