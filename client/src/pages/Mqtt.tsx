@@ -51,6 +51,7 @@ export default function Mqtt() {
   const [publishMessage, setPublishMessage] = useState('');
   const [publishQos, setPublishQos] = useState('0');
   const [publishRetain, setPublishRetain] = useState(false);
+  const [localConfig, setLocalConfig] = useState<any>(null);
   const { toast } = useToast();
 
   // Fetch MQTT status
@@ -67,6 +68,13 @@ export default function Mqtt() {
   const { data: mqttTopics, isLoading: loadingTopics, refetch: refetchTopics } = useQuery<MqttTopic[]>({
     queryKey: ['/api/mqtt/topics'],
   });
+
+  // Initialiser l'état local avec les données de la configuration
+  useEffect(() => {
+    if (mqttConfig && !localConfig) {
+      setLocalConfig(mqttConfig);
+    }
+  }, [mqttConfig, localConfig]);
 
   // Mutations pour la gestion des topics
   const subscribeMutation = useMutation({
@@ -216,11 +224,11 @@ export default function Mqtt() {
   };
 
   const handleSaveConfig = async () => {
-    if (!mqttConfig) return;
+    if (!localConfig) return;
 
     try {
-      // Sauvegarder la configuration
-      await apiRequest('PUT', '/api/mqtt/config', mqttConfig);
+      // Sauvegarder la configuration locale
+      await apiRequest('PUT', '/api/mqtt/config', localConfig);
       
       toast({
         title: 'Configuration sauvegardée',
@@ -228,7 +236,11 @@ export default function Mqtt() {
       });
       
       // Forcer une reconnexion en redémarrant l'adaptateur
-      await apiRequest('POST', '/api/adapters/mqtt/restart', {});
+      try {
+        await apiRequest('POST', '/api/adapters/mqtt/restart', {});
+      } catch (restartError) {
+        console.log('Restart error (normal):', restartError);
+      }
       
       // Attendre un peu puis rafraîchir le statut
       setTimeout(() => {
@@ -611,17 +623,16 @@ export default function Mqtt() {
             <CardContent>
               {loadingConfig ? (
                 <div>Chargement...</div>
-              ) : mqttConfig ? (
+              ) : localConfig ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="host">Serveur MQTT</Label>
                       <Input 
                         id="host"
-                        value={mqttConfig.host || ''} 
+                        value={localConfig.host || ''} 
                         onChange={(e) => {
-                          const newConfig = { ...mqttConfig, host: e.target.value };
-                          queryClient.setQueryData(['/api/mqtt/config'], newConfig);
+                          setLocalConfig({ ...localConfig, host: e.target.value });
                         }}
                         placeholder="localhost ou broker.example.com"
                       />
@@ -631,10 +642,9 @@ export default function Mqtt() {
                       <Input 
                         id="port"
                         type="number" 
-                        value={mqttConfig.port || ''} 
+                        value={localConfig.port || ''} 
                         onChange={(e) => {
-                          const newConfig = { ...mqttConfig, port: parseInt(e.target.value) };
-                          queryClient.setQueryData(['/api/mqtt/config'], newConfig);
+                          setLocalConfig({ ...localConfig, port: parseInt(e.target.value) || 0 });
                         }}
                         placeholder="1883"
                       />
@@ -643,10 +653,9 @@ export default function Mqtt() {
                       <Label htmlFor="username">Nom d'utilisateur</Label>
                       <Input 
                         id="username"
-                        value={mqttConfig.username || ''} 
+                        value={localConfig.username || ''} 
                         onChange={(e) => {
-                          const newConfig = { ...mqttConfig, username: e.target.value };
-                          queryClient.setQueryData(['/api/mqtt/config'], newConfig);
+                          setLocalConfig({ ...localConfig, username: e.target.value });
                         }}
                         placeholder="Optionnel"
                       />
@@ -656,10 +665,9 @@ export default function Mqtt() {
                       <Input 
                         id="password"
                         type="password" 
-                        value={mqttConfig.password || ''} 
+                        value={localConfig.password || ''} 
                         onChange={(e) => {
-                          const newConfig = { ...mqttConfig, password: e.target.value };
-                          queryClient.setQueryData(['/api/mqtt/config'], newConfig);
+                          setLocalConfig({ ...localConfig, password: e.target.value });
                         }}
                         placeholder="Optionnel"
                       />
