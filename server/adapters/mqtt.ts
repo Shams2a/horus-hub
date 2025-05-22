@@ -1,217 +1,14 @@
 import { EventEmitter } from 'events';
+import * as mqtt from 'mqtt';
 import logger from '../utils/logger';
 import { AdapterManager } from './AdapterManager';
 import { storage } from '../storage';
 
 /**
- * Mock for MQTT client as we can't use the real library in this environment
- */
-class MockMqttClient extends EventEmitter {
-  private connected: boolean = false;
-  private options: any;
-  private topics: Map<string, number> = new Map();
-  private messagesPublished: number = 0;
-  private messagesReceived: number = 0;
-  private lastMessageTime: string | null = null;
-  private reconnectTimer: NodeJS.Timeout | null = null;
-
-  constructor(url: string, options: any) {
-    super();
-    this.options = options;
-    logger.debug('Creating MQTT client', { url, clientId: options.clientId });
-  }
-
-  connect(): this {
-    logger.info('Connecting to MQTT broker', { host: this.options.host, port: this.options.port });
-    
-    // Simulate connection after a short delay
-    setTimeout(() => {
-      this.connected = true;
-      this.emit('connect');
-      logger.info('Connected to MQTT broker');
-      
-      // Simulate receiving messages after connection
-      this.simulateMessages();
-    }, 500);
-    
-    return this;
-  }
-
-  end(force?: boolean): Promise<void> {
-    logger.info('Disconnecting from MQTT broker');
-    this.connected = false;
-    this.emit('close');
-    return Promise.resolve();
-  }
-
-  subscribe(topic: string | string[], options?: { qos?: number }): Promise<void> {
-    const qos = options?.qos || 0;
-    
-    if (Array.isArray(topic)) {
-      topic.forEach(t => {
-        this.topics.set(t, qos);
-        logger.info('Subscribed to topic', { topic: t, qos });
-      });
-    } else {
-      this.topics.set(topic, qos);
-      logger.info('Subscribed to topic', { topic, qos });
-    }
-    
-    return Promise.resolve();
-  }
-
-  unsubscribe(topic: string | string[]): Promise<void> {
-    if (Array.isArray(topic)) {
-      topic.forEach(t => {
-        this.topics.delete(t);
-        logger.info('Unsubscribed from topic', { topic: t });
-      });
-    } else {
-      this.topics.delete(topic);
-      logger.info('Unsubscribed from topic', { topic });
-    }
-    
-    return Promise.resolve();
-  }
-
-  publish(topic: string, message: string | Buffer, options?: { qos?: number, retain?: boolean }): Promise<void> {
-    const qos = options?.qos || 0;
-    const retain = options?.retain || false;
-    
-    logger.debug('Publishing message', { topic, qos, retain });
-    this.messagesPublished++;
-    this.lastMessageTime = new Date().toISOString();
-    
-    // For subscribed topics, simulate receiving the message as well
-    if (this.matchesTopic(topic)) {
-      this.messagesReceived++;
-      
-      setTimeout(() => {
-        this.emit('message', topic, typeof message === 'string' ? message : message.toString());
-      }, 50);
-    }
-    
-    return Promise.resolve();
-  }
-
-  private simulateMessages(): void {
-    // Periodically simulate receiving messages for subscribed topics
-    const interval = setInterval(() => {
-      if (!this.connected) {
-        clearInterval(interval);
-        return;
-      }
-      
-      // Only simulate messages if there are subscribed topics
-      if (this.topics.size > 0) {
-        const topics = Array.from(this.topics.keys());
-        const randomTopic = topics[Math.floor(Math.random() * topics.length)];
-        
-        // Generate a random message
-        let message;
-        if (randomTopic.includes('zigbee')) {
-          message = JSON.stringify({
-            state: Math.random() > 0.5 ? 'ON' : 'OFF',
-            brightness: Math.floor(Math.random() * 100),
-            timestamp: new Date().toISOString()
-          });
-        } else if (randomTopic.includes('wifi')) {
-          message = JSON.stringify({
-            online: true,
-            ip: '',
-            lastSeen: new Date().toISOString()
-          });
-        } else {
-          message = JSON.stringify({
-            uptime: Math.floor(Math.random() * 86400),
-            memory: {
-              free: Math.floor(Math.random() * 512348),
-              total: 1048576
-            }
-          });
-        }
-        
-        this.messagesReceived++;
-        this.lastMessageTime = new Date().toISOString();
-        this.emit('message', randomTopic, message);
-      }
-    }, 10000); // Simulate a message every 10 seconds
-  }
-
-  private matchesTopic(publishTopic: string): boolean {
-    // Check if any subscribed topic matches the published topic
-    // including wildcard topics like 'horus/+/status'
-    for (const subscribedTopic of this.topics.keys()) {
-      if (this.topicMatches(subscribedTopic, publishTopic)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private topicMatches(subscribedTopic: string, publishTopic: string): boolean {
-    // Simple wildcard matching
-    const subParts = subscribedTopic.split('/');
-    const pubParts = publishTopic.split('/');
-    
-    if (subParts.length > pubParts.length && subParts[subParts.length - 1] !== '#') {
-      return false;
-    }
-    
-    for (let i = 0; i < subParts.length; i++) {
-      if (subParts[i] === '+') {
-        continue; // Single-level wildcard matches anything
-      } else if (subParts[i] === '#') {
-        return true; // Multi-level wildcard matches all remaining levels
-      } else if (subParts[i] !== pubParts[i]) {
-        return false; // Exact parts must match
-      }
-    }
-    
-    return subParts.length === pubParts.length;
-  }
-
-  isConnected(): boolean {
-    return this.connected;
-  }
-
-  getStats(): any {
-    return {
-      connected: this.connected,
-      messagesPublished: this.messagesPublished,
-      messagesReceived: this.messagesReceived,
-      lastMessageTime: this.lastMessageTime,
-      subscribedTopics: Array.from(this.topics.entries())
-    };
-  }
-
-  reconnect(): void {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-    }
-    
-    logger.info('Attempting to reconnect to MQTT broker');
-    this.connected = false;
-    this.emit('close');
-    
-    this.reconnectTimer = setTimeout(() => {
-      this.connected = true;
-      this.emit('connect');
-      logger.info('Reconnected to MQTT broker');
-      
-      // Re-subscribe to all topics
-      for (const [topic, qos] of this.topics.entries()) {
-        logger.info('Re-subscribing to topic', { topic, qos });
-      }
-    }, 1000);
-  }
-}
-
-/**
- * MQTT Adapter class to manage MQTT connection and messaging
+ * MQTT Adapter class to manage MQTT connection and messaging with real MQTTS support
  */
 export class MqttAdapter {
-  private client: MockMqttClient | null = null;
+  private client: mqtt.MqttClient | null = null;
   private adapterManager: AdapterManager;
   private started: boolean = false;
   private config: any;
@@ -219,340 +16,392 @@ export class MqttAdapter {
   private reconnectMaxAttempts: number = 10;
   private reconnectDelay: number = 5000;
   private topics: Map<string, { qos: number, lastMessage?: any }> = new Map();
-  
+  private messagesPublished: number = 0;
+  private messagesReceived: number = 0;
+  private lastMessageTime: string | null = null;
+  private isConnecting: boolean = false;
+
   constructor(adapterManager: AdapterManager) {
     this.adapterManager = adapterManager;
+    this.config = {
+      protocol: 'mqtts',
+      host: '6f66b254393d4dea9f6ed5d169c03469.s1.eu.hivemq.cloud',
+      port: 8883,
+      username: 'shams5',
+      password: 'Shams123*',
+      clientId: 'HorusHub_' + Math.random().toString(16).substr(2, 8),
+      baseTopic: 'horus',
+      useTls: true,
+      cleanSession: true,
+      retainMessages: false,
+      persistentConnection: true
+    };
   }
-  
+
   async start(): Promise<void> {
-    try {
-      logger.info('Starting MQTT adapter');
-      
-      // Get MQTT settings from storage
-      const mqttSettings = await storage.getSetting('mqtt');
-      this.config = mqttSettings?.value || {
-        protocol: 'mqtt',
-        host: 'localhost',
-        port: 1883,
-        username: '',
-        password: '',
-        baseTopic: 'horus',
-        useTls: false,
-        cleanSession: true,
-        retainMessages: false,
-        persistentConnection: true
-      };
-      
-      // Create MQTT client
-      await this.connect();
-      
-      // Save adapter in storage
-      const existingAdapter = await storage.getAdapterByName('mqtt');
-      if (existingAdapter) {
-        await storage.updateAdapter(existingAdapter.id, { status: 'active' });
-      } else {
-        await storage.insertAdapter({
-          name: 'mqtt',
-          type: 'mqtt',
-          status: 'active',
-          config: this.config
-        });
-      }
-      
-      this.started = true;
-      logger.info('MQTT adapter started successfully');
-      
-      // Load and subscribe to stored topics
-      await this.loadStoredTopics();
-    } catch (error) {
-      logger.error('Failed to start MQTT adapter', { error });
-      throw error;
+    if (this.started) {
+      logger.info('MQTT adapter already started');
+      return;
     }
+
+    logger.info('Starting MQTT adapter');
+    this.started = true;
+
+    await this.loadStoredTopics();
+    await this.connect();
+
+    logger.info('MQTT adapter started successfully');
   }
-  
+
   private async loadStoredTopics(): Promise<void> {
     try {
-      // TODO: In a real implementation, we would load topics from storage
-      // For now, we'll just subscribe to some default topics
-      await this.subscribeTopic('horus/zigbee/+/state', 1);
-      await this.subscribeTopic('horus/wifi/+/status', 0);
-      await this.subscribeTopic('horus/system/heartbeat', 0);
-    } catch (error) {
+      // Load previously subscribed topics from storage
+      // For now, we'll start with an empty topic list
+      logger.debug('Loading stored MQTT topics');
+    } catch (error: any) {
       logger.error('Failed to load stored topics', { error });
     }
   }
-  
+
   private async connect(): Promise<void> {
-    // If client exists and is connected, disconnect first
-    if (this.client && this.client.isConnected()) {
-      await this.client.end();
-    }
-    
-    // Construct the MQTT URL
-    const url = `${this.config.protocol}://${this.config.host}:${this.config.port}`;
-    
-    // Create client options
-    const options: any = {
-      clientId: `horus_hub_${Date.now()}`,
-      clean: this.config.cleanSession,
-      reconnectPeriod: this.config.persistentConnection ? 1000 : 0,
-      keepalive: 60
-    };
-    
-    // Add authentication if provided
-    if (this.config.username) {
-      options.username = this.config.username;
-      options.password = this.config.password;
-    }
-    
-    // Create client
-    this.client = new MockMqttClient(url, options);
-    
-    // Set up event handlers
-    this.client.on('connect', () => {
-      logger.info('Connected to MQTT broker');
-      this.reconnectAttempts = 0;
-      
-      // Re-subscribe to all topics
-      this.topics.forEach(async (value, topic) => {
-        await this.subscribeTopic(topic, value.qos);
-      });
-      
-      // Broadcast connection status to clients
-      if (this.adapterManager.broadcast) {
-        this.adapterManager.broadcast('mqtt_status_changed', { connected: true });
-      }
-    });
-    
-    this.client.on('close', () => {
-      logger.info('Disconnected from MQTT broker');
-      
-      // Broadcast connection status to clients
-      if (this.adapterManager.broadcast) {
-        this.adapterManager.broadcast('mqtt_status_changed', { connected: false });
-      }
-      
-      // Attempt to reconnect if needed
-      if (this.config.persistentConnection && this.started) {
-        this.reconnect();
-      }
-    });
-    
-    this.client.on('error', (error) => {
-      logger.error('MQTT client error', { error });
-    });
-    
-    this.client.on('message', (topic: string, message: string) => {
-      try {
-        logger.debug('Received MQTT message', { topic });
-        
-        // Parse the message if it's JSON
-        let parsedMessage;
-        try {
-          parsedMessage = JSON.parse(message);
-        } catch (e) {
-          parsedMessage = message;
-        }
-        
-        // Update the last message for this topic
-        const topicInfo = this.topics.get(topic) || { qos: 0 };
-        topicInfo.lastMessage = parsedMessage;
-        this.topics.set(topic, topicInfo);
-        
-        // Process the message based on topic
-        this.processMessage(topic, parsedMessage);
-        
-        // Broadcast the message to clients
-        if (this.adapterManager.broadcast) {
-          this.adapterManager.broadcast('mqtt_message', { topic, payload: parsedMessage });
-        }
-      } catch (error) {
-        logger.error('Error processing MQTT message', { error, topic });
-      }
-    });
-    
-    // Connect to the broker
-    this.client.connect();
-  }
-  
-  private reconnect(): void {
-    if (this.reconnectAttempts >= this.reconnectMaxAttempts) {
-      logger.warn(`Exceeded maximum reconnect attempts (${this.reconnectMaxAttempts})`);
+    if (this.isConnecting || this.client?.connected) {
       return;
     }
-    
-    this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    
-    logger.info(`Attempting to reconnect to MQTT broker in ${delay}ms (attempt ${this.reconnectAttempts})`);
-    
-    setTimeout(() => {
-      if (this.client) {
-        this.client.reconnect();
-      } else {
-        this.connect().catch(error => {
-          logger.error('Failed to reconnect to MQTT broker', { error });
-        });
+
+    this.isConnecting = true;
+    logger.info('Connecting to MQTT broker', this.config);
+
+    try {
+      // Construct the broker URL with proper protocol
+      const protocol = this.config.protocol === 'mqtts' ? 'mqtts' : 'mqtt';
+      const brokerUrl = `${protocol}://${this.config.host}:${this.config.port}`;
+
+      // MQTT connection options with MQTTS support
+      const options: mqtt.IClientOptions = {
+        clientId: this.config.clientId,
+        clean: this.config.cleanSession,
+        keepalive: 60,
+        reconnectPeriod: 0, // We handle reconnection manually
+        connectTimeout: 30000,
+        will: {
+          topic: `${this.config.baseTopic}/status`,
+          payload: JSON.stringify({
+            clientId: this.config.clientId,
+            status: 'offline',
+            timestamp: new Date().toISOString()
+          }),
+          qos: 1,
+          retain: true
+        }
+      };
+
+      // Add authentication if provided
+      if (this.config.username) {
+        options.username = this.config.username;
       }
-    }, delay);
-  }
-  
-  private processMessage(topic: string, message: any): void {
-    // Extract device information from topic
-    const topicParts = topic.split('/');
-    
-    if (topicParts.length >= 4 && topicParts[0] === this.config.baseTopic) {
-      const protocol = topicParts[1]; // 'zigbee' or 'wifi'
-      const deviceId = topicParts[2];
-      const messageType = topicParts[3]; // 'state', 'status', etc.
-      
-      // Process messages for known devices
-      if (protocol && deviceId && messageType) {
-        this.updateDeviceFromMessage(protocol, deviceId, messageType, message);
+      if (this.config.password) {
+        options.password = this.config.password;
       }
-    }
-  }
-  
-  private async updateDeviceFromMessage(protocol: string, deviceId: string, messageType: string, message: any): Promise<void> {
-    // Find the device in storage
-    const device = await storage.getDeviceByDeviceId(deviceId);
-    
-    if (device) {
-      // Update device state based on message type
-      if (messageType === 'state' || messageType === 'status') {
-        await storage.updateDeviceState(device.id, message);
+
+      // MQTTS/TLS specific options
+      if (protocol === 'mqtts') {
+        options.rejectUnauthorized = true;
+        options.protocol = 'mqtts';
+      }
+
+      logger.debug('MQTT connection options', { 
+        brokerUrl, 
+        clientId: options.clientId,
+        username: options.username ? '***' : undefined,
+        protocol: options.protocol 
+      });
+
+      // Create the MQTT client
+      this.client = mqtt.connect(brokerUrl, options);
+
+      // Set up event listeners
+      this.client.on('connect', () => {
+        this.isConnecting = false;
+        this.reconnectAttempts = 0;
+        logger.info('Connected to MQTT broker');
         
-        // Log the activity
-        await storage.insertActivity({
-          deviceId: device.id,
-          activity: 'state_change',
-          details: {
-            name: device.name,
-            type: device.type,
-            ...message
+        // Publish online status
+        this.publishOnlineStatus();
+        
+        // Re-subscribe to all topics
+        this.resubscribeToTopics();
+        
+        // Notify adapter manager
+        if (this.adapterManager.broadcast) {
+          this.adapterManager.broadcast('mqtt:connected', {
+            broker: this.config.host,
+            port: this.config.port,
+            clientId: this.config.clientId
+          });
+        }
+      });
+
+      this.client.on('message', (topic: string, message: Buffer) => {
+        try {
+          this.messagesReceived++;
+          this.lastMessageTime = new Date().toISOString();
+          
+          const messageStr = message.toString();
+          logger.debug('Received MQTT message', { topic, message: messageStr });
+          
+          // Update topic info
+          const topicInfo = this.topics.get(topic);
+          if (topicInfo) {
+            topicInfo.lastMessage = {
+              content: messageStr,
+              timestamp: this.lastMessageTime
+            };
           }
+
+          this.processMessage(topic, messageStr);
+        } catch (error: any) {
+          logger.error('Error processing MQTT message', { topic, error: error.message });
+        }
+      });
+
+      this.client.on('error', (error: Error) => {
+        this.isConnecting = false;
+        logger.error('MQTT client error', { error: error.message });
+        this.handleDisconnection();
+      });
+
+      this.client.on('close', () => {
+        this.isConnecting = false;
+        logger.info('Disconnected from MQTT broker');
+        this.handleDisconnection();
+      });
+
+      this.client.on('offline', () => {
+        this.isConnecting = false;
+        logger.warn('MQTT client offline');
+        this.handleDisconnection();
+      });
+
+    } catch (error: any) {
+      this.isConnecting = false;
+      logger.error('Failed to connect to MQTT broker', { error: error.message });
+      this.handleDisconnection();
+    }
+  }
+
+  private handleDisconnection(): void {
+    if (!this.started) return;
+
+    if (this.reconnectAttempts < this.reconnectMaxAttempts) {
+      this.reconnectAttempts++;
+      logger.info(`Attempting to reconnect to MQTT broker in ${this.reconnectDelay}ms (attempt ${this.reconnectAttempts})`);
+      
+      setTimeout(() => {
+        if (this.started && (!this.client || !this.client.connected)) {
+          this.connect();
+        }
+      }, this.reconnectDelay);
+    } else {
+      logger.error('Max reconnection attempts reached for MQTT broker');
+    }
+  }
+
+  private publishOnlineStatus(): void {
+    if (!this.client?.connected) return;
+
+    const statusMessage = {
+      clientId: this.config.clientId,
+      status: 'online',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0'
+    };
+
+    this.client.publish(
+      `${this.config.baseTopic}/status`,
+      JSON.stringify(statusMessage),
+      { qos: 1, retain: true }
+    );
+  }
+
+  private async resubscribeToTopics(): Promise<void> {
+    if (!this.client?.connected) return;
+
+    for (const [topic, info] of this.topics.entries()) {
+      try {
+        await this.client.subscribeAsync(topic, { qos: info.qos });
+        logger.debug('Resubscribed to MQTT topic', { topic, qos: info.qos });
+      } catch (error: any) {
+        logger.error('Failed to resubscribe to topic', { topic, error: error.message });
+      }
+    }
+  }
+
+  private processMessage(topic: string, message: string): void {
+    try {
+      // Parse the topic to determine device protocol and ID
+      const topicParts = topic.split('/');
+      if (topicParts.length >= 3) {
+        const [baseTopic, protocol, deviceId, ...rest] = topicParts;
+        const messageType = rest.join('/') || 'data';
+
+        if (baseTopic === this.config.baseTopic) {
+          this.updateDeviceFromMessage(protocol, deviceId, messageType, message);
+        }
+      }
+
+      // Broadcast to connected clients
+      if (this.adapterManager.broadcast) {
+        this.adapterManager.broadcast('mqtt:message', {
+          topic,
+          message,
+          timestamp: this.lastMessageTime
         });
-        
-        logger.debug('Updated device state from MQTT message', {
-          deviceId: device.id,
+      }
+
+    } catch (error: any) {
+      logger.error('Error processing MQTT message', { topic, error: error.message });
+    }
+  }
+
+  private async updateDeviceFromMessage(protocol: string, deviceId: string, messageType: string, message: string): Promise<void> {
+    try {
+      // Find or create device in storage
+      let device = await storage.getDeviceByDeviceId(deviceId);
+      
+      if (!device) {
+        device = await storage.insertDevice({
+          deviceId,
+          name: `${protocol.toUpperCase()} Device ${deviceId}`,
           protocol,
-          message
+          address: deviceId,
+          state: {},
+          lastSeen: new Date()
         });
+        logger.info('Created new device from MQTT message', { deviceId, protocol });
       }
+
+      // Update device state based on message
+      let parsedMessage: any;
+      try {
+        parsedMessage = JSON.parse(message);
+      } catch {
+        parsedMessage = { value: message };
+      }
+
+      const updatedState = {
+        ...device.state,
+        [messageType]: parsedMessage,
+        lastUpdate: new Date().toISOString()
+      };
+
+      await storage.updateDeviceState(device.id, updatedState);
+      
+    } catch (error: any) {
+      logger.error('Failed to update device from MQTT message', { 
+        protocol, deviceId, messageType, error: error.message 
+      });
     }
   }
-  
+
   async stop(): Promise<void> {
-    try {
-      logger.info('Stopping MQTT adapter');
-      
-      if (this.client) {
-        await this.client.end();
-        this.client = null;
+    logger.info('Stopping MQTT adapter');
+    this.started = false;
+
+    if (this.client) {
+      try {
+        // Publish offline status
+        if (this.client.connected) {
+          const statusMessage = {
+            clientId: this.config.clientId,
+            status: 'offline',
+            timestamp: new Date().toISOString()
+          };
+
+          this.client.publish(
+            `${this.config.baseTopic}/status`,
+            JSON.stringify(statusMessage),
+            { qos: 1, retain: true }
+          );
+        }
+
+        await this.client.endAsync();
+        logger.info('MQTT client disconnected gracefully');
+      } catch (error: any) {
+        logger.error('Error stopping MQTT client', { error: error.message });
       }
       
-      // Update adapter status in storage
-      const existingAdapter = await storage.getAdapterByName('mqtt');
-      if (existingAdapter) {
-        await storage.updateAdapter(existingAdapter.id, { status: 'inactive' });
-      }
-      
-      this.started = false;
-      logger.info('MQTT adapter stopped successfully');
-    } catch (error) {
-      logger.error('Failed to stop MQTT adapter', { error });
-      throw error;
+      this.client = null;
     }
   }
-  
+
   async subscribeTopic(topic: string, qos: number = 0): Promise<void> {
-    if (!this.client || !this.client.isConnected()) {
-      throw new Error('MQTT client is not connected');
+    if (!this.client?.connected) {
+      throw new Error('MQTT client not connected');
     }
-    
+
     try {
-      await this.client.subscribe(topic, { qos });
-      
-      // Store the topic in our local map
+      await this.client.subscribeAsync(topic, { qos });
       this.topics.set(topic, { qos });
-      
       logger.info('Subscribed to MQTT topic', { topic, qos });
-    } catch (error) {
-      logger.error('Failed to subscribe to MQTT topic', { error, topic });
+    } catch (error: any) {
+      logger.error('Failed to subscribe to MQTT topic', { topic, error: error.message });
       throw error;
     }
   }
-  
+
   async unsubscribeTopic(topic: string): Promise<void> {
-    if (!this.client || !this.client.isConnected()) {
-      throw new Error('MQTT client is not connected');
+    if (!this.client?.connected) {
+      throw new Error('MQTT client not connected');
     }
-    
+
     try {
-      await this.client.unsubscribe(topic);
-      
-      // Remove the topic from our local map
+      await this.client.unsubscribeAsync(topic);
       this.topics.delete(topic);
-      
       logger.info('Unsubscribed from MQTT topic', { topic });
-    } catch (error) {
-      logger.error('Failed to unsubscribe from MQTT topic', { error, topic });
+    } catch (error: any) {
+      logger.error('Failed to unsubscribe from MQTT topic', { topic, error: error.message });
       throw error;
     }
   }
-  
+
   async publishMessage(topic: string, message: any, options: { qos?: number, retain?: boolean } = {}): Promise<void> {
-    if (!this.client || !this.client.isConnected()) {
-      throw new Error('MQTT client is not connected');
+    if (!this.client?.connected) {
+      throw new Error('MQTT client not connected');
     }
-    
+
     try {
-      // Ensure the topic starts with the base topic
-      const fullTopic = topic.startsWith(this.config.baseTopic) ? topic : `${this.config.baseTopic}/${topic}`;
-      
-      // Convert message to string if it's an object
-      const messageStr = typeof message === 'object' ? JSON.stringify(message) : message.toString();
-      
-      await this.client.publish(fullTopic, messageStr, {
+      const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+      await this.client.publishAsync(topic, messageStr, {
         qos: options.qos || 0,
-        retain: options.retain !== undefined ? options.retain : this.config.retainMessages
+        retain: options.retain || false
       });
       
-      logger.debug('Published MQTT message', { topic: fullTopic });
-    } catch (error) {
-      logger.error('Failed to publish MQTT message', { error, topic });
+      this.messagesPublished++;
+      this.lastMessageTime = new Date().toISOString();
+      
+      logger.debug('Published MQTT message', { topic, qos: options.qos, retain: options.retain });
+    } catch (error: any) {
+      logger.error('Failed to publish MQTT message', { topic, error: error.message });
       throw error;
     }
   }
-  
+
   getStatus(): any {
-    // Return false connection status until a real broker is configured
-    // Mock clients should not show as "connected"
-    const isRealBroker = this.config?.host && 
-                        this.config.host !== 'localhost' && 
-                        this.config.host !== '127.0.0.1' &&
-                        this.config.host.trim() !== '';
+    const isConnected = this.client?.connected || false;
     
-    if (!this.client || !isRealBroker) {
-      return {
-        connected: false,
-        messagesPublished: 0,
-        messagesReceived: 0,
-        lastMessageTime: null,
-        topics: []
-      };
-    }
-    
-    const stats = this.client.getStats();
     return {
-      connected: false, // Always false until real broker is connected
-      messagesPublished: 0,
-      messagesReceived: 0,
-      lastMessageTime: null,
-      topics: []
+      connected: isConnected,
+      messagesPublished: this.messagesPublished,
+      messagesReceived: this.messagesReceived,
+      lastMessageTime: this.lastMessageTime,
+      topics: Array.from(this.topics.keys()),
+      reconnectAttempts: this.reconnectAttempts,
+      clientId: this.config.clientId,
+      broker: this.config.host,
+      port: this.config.port
     };
   }
-  
+
   getTopics(): any[] {
     return Array.from(this.topics.entries()).map(([topic, info]) => ({
       topic,
@@ -560,37 +409,67 @@ export class MqttAdapter {
       lastMessage: info.lastMessage
     }));
   }
-  
+
   getConfig(): any {
-    return this.config;
+    return { ...this.config };
   }
-  
+
   async updateConfig(newConfig: any): Promise<void> {
-    // Save the new configuration
-    this.config = {
-      ...this.config,
-      ...newConfig
-    };
-    
-    // Update settings in storage
-    await storage.updateSetting('mqtt', this.config);
-    
-    // Reconnect with new configuration
-    await this.connect();
+    const oldConfig = { ...this.config };
+    this.config = { ...this.config, ...newConfig };
     
     logger.info('MQTT configuration updated', { newConfig });
-  }
-  
-  async testConnection(): Promise<boolean> {
-    if (this.client && this.client.isConnected()) {
-      return true;
-    }
-    
-    try {
+
+    // If connection parameters changed, reconnect
+    const connectionChanged = 
+      oldConfig.host !== this.config.host ||
+      oldConfig.port !== this.config.port ||
+      oldConfig.username !== this.config.username ||
+      oldConfig.password !== this.config.password ||
+      oldConfig.protocol !== this.config.protocol;
+
+    if (connectionChanged && this.started) {
+      logger.info('MQTT connection parameters changed, reconnecting...');
+      
+      // Disconnect current client
+      if (this.client) {
+        try {
+          await this.client.endAsync();
+        } catch (error) {
+          logger.warn('Error disconnecting old MQTT client', { error });
+        }
+        this.client = null;
+      }
+
+      // Reset connection state
+      this.isConnecting = false;
+      this.reconnectAttempts = 0;
+
+      // Reconnect with new config
       await this.connect();
-      return this.client !== null && this.client.isConnected();
-    } catch (error) {
-      logger.error('MQTT connection test failed', { error });
+    }
+
+    logger.info('MQTT configuration updated');
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      if (this.client?.connected) {
+        // Test by publishing a test message
+        await this.publishMessage(
+          `${this.config.baseTopic}/test`,
+          {
+            test: true,
+            timestamp: new Date().toISOString(),
+            clientId: this.config.clientId
+          },
+          { qos: 0 }
+        );
+        return true;
+      }
+      return false;
+    } catch (error: any) {
+      logger.error('MQTT connection test failed', { error: error.message });
       return false;
     }
   }
@@ -602,19 +481,9 @@ export class MqttAdapter {
 export async function setupMqttAdapter(adapterManager: AdapterManager): Promise<MqttAdapter> {
   logger.info('Setting up MQTT adapter');
   
-  // Create MQTT adapter instance
   const mqttAdapter = new MqttAdapter(adapterManager);
-  
-  // Register the adapter with the manager
   adapterManager.registerAdapter('mqtt', mqttAdapter);
-  
-  // Start the adapter
-  try {
-    await mqttAdapter.start();
-  } catch (error) {
-    logger.error('Failed to start MQTT adapter during setup', { error });
-    // We'll continue even if there's an error, so the user can reconfigure the adapter
-  }
+  logger.info('Registered mqtt adapter');
   
   return mqttAdapter;
 }
