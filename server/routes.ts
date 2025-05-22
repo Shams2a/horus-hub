@@ -81,7 +81,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Register and start adapters
     await setupZigbeeAdapter(adapterManager);
     await setupWifiAdapter(adapterManager);
-    await setupMqttAdapter(adapterManager);
+    const mqttAdapter = await setupMqttAdapter(adapterManager);
+    
+    // Start MQTT adapter immediately
+    await mqttAdapter.start();
     
     // Make adapter manager available to controllers
     app.locals.adapterManager = adapterManager;
@@ -184,6 +187,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/adapters/recommended', adapterDetectionController.getRecommendedAdaptersList);
   app.get('/api/adapters/details/:vid/:pid', adapterDetectionController.getAdapterDetails);
   app.get('/api/adapters/statistics', adapterDetectionController.getAdapterStatistics);
+
+  // MQTT routes
+  app.get('/api/mqtt/status', (req, res) => {
+    const mqttAdapter = adapterManager.getAdapter('mqtt') as any;
+    res.json(mqttAdapter ? mqttAdapter.getStatus() : { connected: false });
+  });
+  
+  app.get('/api/mqtt/config', (req, res) => {
+    const mqttAdapter = adapterManager.getAdapter('mqtt') as any;
+    res.json(mqttAdapter ? mqttAdapter.getConfig() : {});
+  });
+  
+  app.put('/api/mqtt/config', async (req, res) => {
+    try {
+      const mqttAdapter = adapterManager.getAdapter('mqtt') as any;
+      if (mqttAdapter) {
+        await mqttAdapter.updateConfig(req.body);
+        res.json({ success: true, message: 'Configuration MQTT mise à jour' });
+      } else {
+        res.status(404).json({ error: 'Adaptateur MQTT non trouvé' });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  app.get('/api/mqtt/topics', (req, res) => {
+    const mqttAdapter = adapterManager.getAdapter('mqtt') as any;
+    res.json(mqttAdapter ? mqttAdapter.getTopics() : []);
+  });
+  
+  app.post('/api/mqtt/test', async (req, res) => {
+    try {
+      const mqttAdapter = adapterManager.getAdapter('mqtt') as any;
+      if (mqttAdapter) {
+        const isConnected = await mqttAdapter.testConnection();
+        res.json({ success: isConnected, connected: isConnected });
+      } else {
+        res.status(404).json({ error: 'Adaptateur MQTT non trouvé' });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
   
   // Library update routes
   app.get('/api/updates/available', updateController.getAvailableUpdates);
