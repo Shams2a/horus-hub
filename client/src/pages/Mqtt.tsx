@@ -619,7 +619,10 @@ export default function Mqtt() {
                       <Input 
                         id="host"
                         value={mqttConfig.host || ''} 
-                        onChange={(e) => queryClient.setQueryData(['/api/mqtt/config'], { ...mqttConfig, host: e.target.value })}
+                        onChange={(e) => {
+                          const newConfig = { ...mqttConfig, host: e.target.value };
+                          queryClient.setQueryData(['/api/mqtt/config'], newConfig);
+                        }}
                         placeholder="localhost ou broker.example.com"
                       />
                     </div>
@@ -629,7 +632,10 @@ export default function Mqtt() {
                         id="port"
                         type="number" 
                         value={mqttConfig.port || ''} 
-                        onChange={(e) => queryClient.setQueryData(['/api/mqtt/config'], { ...mqttConfig, port: parseInt(e.target.value) })}
+                        onChange={(e) => {
+                          const newConfig = { ...mqttConfig, port: parseInt(e.target.value) };
+                          queryClient.setQueryData(['/api/mqtt/config'], newConfig);
+                        }}
                         placeholder="1883"
                       />
                     </div>
@@ -638,7 +644,10 @@ export default function Mqtt() {
                       <Input 
                         id="username"
                         value={mqttConfig.username || ''} 
-                        onChange={(e) => queryClient.setQueryData(['/api/mqtt/config'], { ...mqttConfig, username: e.target.value })}
+                        onChange={(e) => {
+                          const newConfig = { ...mqttConfig, username: e.target.value };
+                          queryClient.setQueryData(['/api/mqtt/config'], newConfig);
+                        }}
                         placeholder="Optionnel"
                       />
                     </div>
@@ -648,7 +657,10 @@ export default function Mqtt() {
                         id="password"
                         type="password" 
                         value={mqttConfig.password || ''} 
-                        onChange={(e) => queryClient.setQueryData(['/api/mqtt/config'], { ...mqttConfig, password: e.target.value })}
+                        onChange={(e) => {
+                          const newConfig = { ...mqttConfig, password: e.target.value };
+                          queryClient.setQueryData(['/api/mqtt/config'], newConfig);
+                        }}
                         placeholder="Optionnel"
                       />
                     </div>
