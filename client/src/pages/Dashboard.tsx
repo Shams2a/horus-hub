@@ -7,6 +7,15 @@ import DeviceConfigModal from '@/components/DeviceConfigModal';
 import ActivityLog from '@/components/ActivityLog';
 import { CheckCircle, Cpu, Wifi, Cloud } from 'lucide-react';
 
+interface MqttStatus {
+  connected: boolean;
+  broker: string;
+  port: number;
+  messagesPublished: number;
+  messagesReceived: number;
+  reconnectAttempts: number;
+}
+
 export default function Dashboard() {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [configModalOpen, setConfigModalOpen] = useState(false);
@@ -19,6 +28,12 @@ export default function Dashboard() {
   // Fetch all devices
   const { data: devices, isLoading: loadingDevices } = useQuery<Device[]>({
     queryKey: ['/api/devices'],
+  });
+
+  // Fetch MQTT status
+  const { data: mqttStatus } = useQuery<MqttStatus>({
+    queryKey: ['/api/mqtt/status'],
+    refetchInterval: 3000, // Rafraîchir toutes les 3 secondes
   });
 
   const handleConfigClick = (device: Device) => {
@@ -82,14 +97,27 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">MQTT Broker</p>
-                  <p className="text-xl font-semibold mt-1">Non configuré</p>
+                  <p className="text-xl font-semibold mt-1">
+                    {mqttStatus?.connected ? 'Connecté' : 'Déconnecté'}
+                  </p>
                 </div>
-                <div className="p-3 rounded-full bg-gray-200 dark:bg-gray-700">
-                  <Cloud className="h-6 w-6 text-gray-500" />
+                <div className={`p-3 rounded-full ${mqttStatus?.connected ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'}`}>
+                  <Cloud className={`h-6 w-6 ${mqttStatus?.connected ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} />
                 </div>
               </div>
               <div className="mt-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Configurer un broker pour commencer</p>
+                {mqttStatus?.connected ? (
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{mqttStatus.broker}:{mqttStatus.port}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {mqttStatus.messagesReceived} reçus, {mqttStatus.messagesPublished} publiés
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {mqttStatus?.reconnectAttempts > 0 ? 'Tentative de reconnexion...' : 'Configurer un broker pour commencer'}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
