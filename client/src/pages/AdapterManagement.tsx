@@ -292,6 +292,50 @@ const AdapterManagement = () => {
     }
   });
 
+  // Mutation pour sauvegarder la configuration Zigbee
+  const saveZigbeeConfigMutation = useMutation({
+    mutationFn: async (config: any) => {
+      await apiRequest('PUT', '/api/zigbee/config', config);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Configuration sauvegardée",
+        description: "Configuration Zigbee mise à jour avec succès"
+      });
+      // Actualiser le statut
+      queryClient.invalidateQueries({ queryKey: ['/api/zigbee/status'] });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder la configuration Zigbee",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutation pour sauvegarder la configuration WiFi
+  const saveWifiConfigMutation = useMutation({
+    mutationFn: async (config: any) => {
+      await apiRequest('PUT', '/api/wifi/config', config);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Configuration sauvegardée",
+        description: "Configuration WiFi mise à jour avec succès"
+      });
+      // Actualiser le statut
+      queryClient.invalidateQueries({ queryKey: ['/api/wifi/status'] });
+    },
+    onError: () => {
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder la configuration WiFi",
+        variant: "destructive"
+      });
+    }
+  });
+
   // Fonction pour appliquer la configuration détectée
   const applyDetectedConfig = async (protocol: string) => {
     try {
@@ -299,33 +343,17 @@ const AdapterManagement = () => {
       
       if (protocol === 'zigbee' && detectedZigbeeConfig?.found) {
         configData = detectedZigbeeConfig.config.zigbee;
+        saveZigbeeConfigMutation.mutate(configData);
       } else if (protocol === 'wifi' && detectedWifiConfig?.found) {
         configData = detectedWifiConfig.config.wifi;
-      }
-      
-      if (!configData) {
+        saveWifiConfigMutation.mutate(configData);
+      } else {
         toast({
           title: "Erreur",
           description: "Aucune configuration détectée à appliquer",
           variant: "destructive"
         });
-        return;
       }
-
-      // Appliquer la configuration via l'API
-      await apiRequest('PUT', `/api/${protocol}/config`, configData);
-      
-      // Redémarrer l'adaptateur avec la nouvelle configuration
-      await apiRequest('POST', `/api/adapters/${protocol}/restart`);
-      
-      toast({
-        title: "Configuration appliquée",
-        description: `Configuration ${protocol} mise à jour et adaptateur redémarré`
-      });
-      
-      // Actualiser les données
-      queryClient.invalidateQueries({ queryKey: [`/api/${protocol}/status`] });
-      
     } catch (error) {
       toast({
         title: "Erreur",
@@ -712,10 +740,12 @@ const AdapterManagement = () => {
                       </div>
                     )}
                     
+                    <form id="zigbee-form">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Port série</label>
                         <input 
+                          name="serialPort"
                           type="text" 
                           className="w-full p-2 border rounded-md"
                           defaultValue={detectedZigbeeConfig?.config?.zigbee?.serialPort || "/dev/ttyUSB0"}
@@ -724,7 +754,7 @@ const AdapterManagement = () => {
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Débit (Baud Rate)</label>
-                        <select className="w-full p-2 border rounded-md">
+                        <select name="baudRate" className="w-full p-2 border rounded-md">
                           <option value="115200">115200</option>
                           <option value="57600">57600</option>
                           <option value="38400">38400</option>
@@ -733,6 +763,7 @@ const AdapterManagement = () => {
                       <div className="space-y-2">
                         <label className="text-sm font-medium">PAN ID</label>
                         <input 
+                          name="panId"
                           type="text" 
                           className="w-full p-2 border rounded-md"
                           defaultValue={zigbeeStatus.panId || "0x1a62"}
@@ -741,7 +772,7 @@ const AdapterManagement = () => {
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Canal</label>
-                        <select className="w-full p-2 border rounded-md">
+                        <select name="channel" className="w-full p-2 border rounded-md">
                           <option value="11">Canal 11</option>
                           <option value="15">Canal 15</option>
                           <option value="20">Canal 20</option>
@@ -750,7 +781,7 @@ const AdapterManagement = () => {
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Coordinateur</label>
-                        <select className="w-full p-2 border rounded-md">
+                        <select name="coordinator" className="w-full p-2 border rounded-md">
                           <option value="zStack">TI Z-Stack</option>
                           <option value="deconz">deCONZ</option>
                           <option value="zigate">ZiGate</option>
@@ -760,6 +791,7 @@ const AdapterManagement = () => {
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Clé réseau</label>
                         <input 
+                          name="networkKey"
                           type="password" 
                           className="w-full p-2 border rounded-md"
                           placeholder="Clé de chiffrement du réseau"
@@ -768,20 +800,41 @@ const AdapterManagement = () => {
                     </div>
                     
                     <div className="flex items-center space-x-2">
-                      <input type="checkbox" id="zigbee-permit-join" />
+                      <input name="permitJoin" type="checkbox" id="zigbee-permit-join" />
                       <label htmlFor="zigbee-permit-join" className="text-sm">
                         Autoriser l'ajout de nouveaux appareils
                       </label>
                     </div>
                     
                     <div className="flex space-x-3">
-                      <Button className="flex items-center space-x-2">
+                      <Button 
+                        className="flex items-center space-x-2"
+                        onClick={() => {
+                          const formData = new FormData(document.getElementById('zigbee-form') as HTMLFormElement);
+                          const config = {
+                            serialPort: formData.get('serialPort') as string,
+                            baudRate: formData.get('baudRate') as string,
+                            panId: formData.get('panId') as string,
+                            channel: formData.get('channel') as string,
+                            coordinator: formData.get('coordinator') as string,
+                            networkKey: formData.get('networkKey') as string,
+                            permitJoin: formData.get('permitJoin') === 'on'
+                          };
+                          saveZigbeeConfigMutation.mutate(config);
+                        }}
+                        disabled={saveZigbeeConfigMutation.isPending}
+                      >
                         <Save size={16} />
-                        <span>Sauvegarder</span>
+                        <span>{saveZigbeeConfigMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}</span>
                       </Button>
-                      <Button variant="outline" className="flex items-center space-x-2">
+                      <Button 
+                        variant="outline" 
+                        className="flex items-center space-x-2"
+                        onClick={() => restartMutation.mutate('zigbee')}
+                        disabled={restartMutation.isPending}
+                      >
                         <RotateCcw size={16} />
-                        <span>Redémarrer adaptateur</span>
+                        <span>{restartMutation.isPending ? 'Redémarrage...' : 'Redémarrer adaptateur'}</span>
                       </Button>
                     </div>
                   </div>
