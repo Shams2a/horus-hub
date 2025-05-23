@@ -114,11 +114,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Zigbee specific routes
   app.get('/api/zigbee/status', adapterController.getZigbeeStatus);
+  app.put('/api/zigbee/config', adapterManagementController.updateZigbeeConfig);
   app.post('/api/zigbee/permit-join', adapterController.setZigbeePermitJoin);
   app.post('/api/zigbee/map', adapterController.generateZigbeeMap);
   
   // WiFi specific routes
   app.get('/api/wifi/status', adapterController.getWifiStatus);
+  app.put('/api/wifi/config', adapterManagementController.updateWifiConfig);
   app.post('/api/wifi/scan', adapterController.scanWifiNetwork);
   
   // MQTT specific routes

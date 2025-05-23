@@ -292,6 +292,49 @@ const AdapterManagement = () => {
     }
   });
 
+  // Fonction pour appliquer la configuration détectée
+  const applyDetectedConfig = async (protocol: string) => {
+    try {
+      let configData = null;
+      
+      if (protocol === 'zigbee' && detectedZigbeeConfig?.found) {
+        configData = detectedZigbeeConfig.config.zigbee;
+      } else if (protocol === 'wifi' && detectedWifiConfig?.found) {
+        configData = detectedWifiConfig.config.wifi;
+      }
+      
+      if (!configData) {
+        toast({
+          title: "Erreur",
+          description: "Aucune configuration détectée à appliquer",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Appliquer la configuration via l'API
+      await apiRequest('PUT', `/api/${protocol}/config`, configData);
+      
+      // Redémarrer l'adaptateur avec la nouvelle configuration
+      await apiRequest('POST', `/api/adapters/${protocol}/restart`);
+      
+      toast({
+        title: "Configuration appliquée",
+        description: `Configuration ${protocol} mise à jour et adaptateur redémarré`
+      });
+      
+      // Actualiser les données
+      queryClient.invalidateQueries({ queryKey: [`/api/${protocol}/status`] });
+      
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'appliquer la configuration",
+        variant: "destructive"
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'online':
@@ -642,11 +685,21 @@ const AdapterManagement = () => {
                     {/* Affichage des configurations détectées */}
                     {detectedZigbeeConfig?.found && (
                       <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          <h4 className="font-semibold text-green-800 dark:text-green-200">
-                            Configuration détectée automatiquement
-                          </h4>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <h4 className="font-semibold text-green-800 dark:text-green-200">
+                              Configuration détectée automatiquement
+                            </h4>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => applyDetectedConfig('zigbee')}
+                          >
+                            <Save size={14} className="mr-1" />
+                            Appliquer
+                          </Button>
                         </div>
                         <p className="text-sm text-green-700 dark:text-green-300 mb-2">
                           Adaptateur: {detectedZigbeeConfig.config.adapter?.model} 

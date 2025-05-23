@@ -208,10 +208,86 @@ const runDiagnostics = async (req: Request, res: Response) => {
   }
 };
 
+// Nouvelle méthode pour mettre à jour la configuration Zigbee
+const updateZigbeeConfig = async (req: Request, res: Response) => {
+  try {
+    const config = req.body;
+    
+    logger.info('Updating Zigbee configuration', { config });
+    
+    // Obtenir l'adaptateur Zigbee réel
+    const zigbeeAdapter = globalAdapterManager?.getAdapter('zigbee');
+    if (!zigbeeAdapter) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Adaptateur Zigbee non trouvé' 
+      });
+    }
+    
+    // Mettre à jour la configuration si l'adaptateur le permet
+    if (zigbeeAdapter.updateConfig) {
+      await zigbeeAdapter.updateConfig(config);
+    }
+    
+    logger.info('Zigbee configuration updated successfully');
+    
+    res.json({ 
+      success: true, 
+      message: 'Configuration Zigbee mise à jour avec succès',
+      config 
+    });
+  } catch (error: any) {
+    logger.error('Error updating Zigbee configuration', { error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: `Impossible de mettre à jour la configuration: ${error.message}` 
+    });
+  }
+};
+
+// Nouvelle méthode pour mettre à jour la configuration WiFi
+const updateWifiConfig = async (req: Request, res: Response) => {
+  try {
+    const config = req.body;
+    
+    logger.info('Updating WiFi configuration', { config });
+    
+    // Obtenir l'adaptateur WiFi réel
+    const wifiAdapter = globalAdapterManager?.getAdapter('wifi');
+    if (!wifiAdapter) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Adaptateur WiFi non trouvé' 
+      });
+    }
+    
+    // Mettre à jour la configuration si l'adaptateur le permet
+    if (wifiAdapter.updateConfig) {
+      await wifiAdapter.updateConfig(config);
+    }
+    
+    logger.info('WiFi configuration updated successfully');
+    
+    res.json({ 
+      success: true, 
+      message: 'Configuration WiFi mise à jour avec succès',
+      config 
+    });
+  } catch (error: any) {
+    logger.error('Error updating WiFi configuration', { error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: `Impossible de mettre à jour la configuration: ${error.message}` 
+    });
+  }
+};
+
 export default {
   restartAdapter,
   testAdapter,
   resetAdapter,
   getAdapterStatus,
-  runDiagnostics
+  runDiagnostics,
+  updateZigbeeConfig,
+  updateWifiConfig
 };
