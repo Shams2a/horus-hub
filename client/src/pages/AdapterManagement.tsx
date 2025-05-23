@@ -55,8 +55,27 @@ const AdapterManagement = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [detectionResults, setDetectionResults] = useState<any>(null);
   const [isDetecting, setIsDetecting] = useState(false);
-  const [zigbeeConfig, setZigbeeConfig] = useState<any>(null);
-  const [wifiConfig, setWifiConfig] = useState<any>(null);
+  // États pour les formulaires de configuration
+  const [zigbeeFormData, setZigbeeFormData] = useState({
+    serialPort: '/dev/ttyUSB0',
+    baudRate: '115200',
+    panId: '0x1a62',
+    channel: '11',
+    coordinator: 'zStack',
+    networkKey: '',
+    permitJoin: false
+  });
+  
+  const [wifiFormData, setWifiFormData] = useState({
+    networkName: 'HorusHubNetwork',
+    password: '',
+    channel: 'auto',
+    security: 'wpa2',
+    ipAddress: '192.168.1.100',
+    subnetMask: '255.255.255.0',
+    hidden: false,
+    hotspot: false
+  });
 
   // Charger le statut des adaptateurs réels uniquement
   const { data: adapters = [], isLoading, refetch } = useQuery({
@@ -711,7 +730,7 @@ const AdapterManagement = () => {
                 {zigbeeStatus ? (
                   <div className="space-y-4">
                     {/* Affichage des configurations détectées */}
-                    {detectedZigbeeConfig?.found && (
+                    {(detectedZigbeeConfig?.found || detectionResults?.adapters?.find(a => a.adapter && a.confidence === 'high')) && (
                       <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center space-x-2">
@@ -730,12 +749,16 @@ const AdapterManagement = () => {
                           </Button>
                         </div>
                         <p className="text-sm text-green-700 dark:text-green-300 mb-2">
-                          Adaptateur: {detectedZigbeeConfig.config.adapter?.model} 
-                          ({detectedZigbeeConfig.config.adapter?.manufacturer})
+                          {detectedZigbeeConfig ? (
+                            <>Adaptateur: {detectedZigbeeConfig.config?.adapter?.model} ({detectedZigbeeConfig.config?.adapter?.manufacturer})</>
+                          ) : detectionResults?.adapters?.find((a: any) => a.adapter && a.confidence === 'high') ? (
+                            <>Adaptateur: {detectionResults.adapters.find((a: any) => a.adapter && a.confidence === 'high').adapter.name} ({detectionResults.adapters.find((a: any) => a.adapter && a.confidence === 'high').adapter.manufacturer})</>
+                          ) : (
+                            <>Configuration automatique détectée</>
+                          )}
                         </p>
                         <p className="text-xs text-green-600 dark:text-green-400">
-                          Détecté le {new Date(detectedZigbeeConfig.config.detectedAt).toLocaleString()} 
-                          - Confiance: {detectedZigbeeConfig.confidence}
+                          Confiance élevée - Prêt à appliquer
                         </p>
                       </div>
                     )}
@@ -744,10 +767,10 @@ const AdapterManagement = () => {
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Port série</label>
                         <input 
-                          name="serialPort"
                           type="text" 
                           className="w-full p-2 border rounded-md"
-                          defaultValue={detectedZigbeeConfig?.config?.zigbee?.serialPort || "/dev/ttyUSB0"}
+                          value={zigbeeFormData.serialPort}
+                          onChange={(e) => setZigbeeFormData({...zigbeeFormData, serialPort: e.target.value})}
                           placeholder="/dev/ttyUSB0"
                         />
                       </div>
@@ -809,17 +832,7 @@ const AdapterManagement = () => {
                       <Button 
                         className="flex items-center space-x-2"
                         onClick={() => {
-                          // Récupérer les valeurs directement des éléments
-                          const config = {
-                            serialPort: (document.querySelector('input[name="serialPort"]') as HTMLInputElement)?.value || '/dev/ttyUSB0',
-                            baudRate: (document.querySelector('select[name="baudRate"]') as HTMLSelectElement)?.value || '115200',
-                            panId: (document.querySelector('input[name="panId"]') as HTMLInputElement)?.value || '0x1a62',
-                            channel: (document.querySelector('select[name="channel"]') as HTMLSelectElement)?.value || '11',
-                            coordinator: (document.querySelector('select[name="coordinator"]') as HTMLSelectElement)?.value || 'zStack',
-                            networkKey: (document.querySelector('input[name="networkKey"]') as HTMLInputElement)?.value || '',
-                            permitJoin: (document.querySelector('input[name="permitJoin"]') as HTMLInputElement)?.checked || false
-                          };
-                          saveZigbeeConfigMutation.mutate(config);
+                          saveZigbeeConfigMutation.mutate(zigbeeFormData);
                         }}
                         disabled={saveZigbeeConfigMutation.isPending}
                       >
