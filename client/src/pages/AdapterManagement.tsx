@@ -740,7 +740,6 @@ const AdapterManagement = () => {
                       </div>
                     )}
                     
-                    <form id="zigbee-form">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Port série</label>
@@ -810,15 +809,15 @@ const AdapterManagement = () => {
                       <Button 
                         className="flex items-center space-x-2"
                         onClick={() => {
-                          const formData = new FormData(document.getElementById('zigbee-form') as HTMLFormElement);
+                          // Récupérer les valeurs directement des éléments
                           const config = {
-                            serialPort: formData.get('serialPort') as string,
-                            baudRate: formData.get('baudRate') as string,
-                            panId: formData.get('panId') as string,
-                            channel: formData.get('channel') as string,
-                            coordinator: formData.get('coordinator') as string,
-                            networkKey: formData.get('networkKey') as string,
-                            permitJoin: formData.get('permitJoin') === 'on'
+                            serialPort: (document.querySelector('input[name="serialPort"]') as HTMLInputElement)?.value || '/dev/ttyUSB0',
+                            baudRate: (document.querySelector('select[name="baudRate"]') as HTMLSelectElement)?.value || '115200',
+                            panId: (document.querySelector('input[name="panId"]') as HTMLInputElement)?.value || '0x1a62',
+                            channel: (document.querySelector('select[name="channel"]') as HTMLSelectElement)?.value || '11',
+                            coordinator: (document.querySelector('select[name="coordinator"]') as HTMLSelectElement)?.value || 'zStack',
+                            networkKey: (document.querySelector('input[name="networkKey"]') as HTMLInputElement)?.value || '',
+                            permitJoin: (document.querySelector('input[name="permitJoin"]') as HTMLInputElement)?.checked || false
                           };
                           saveZigbeeConfigMutation.mutate(config);
                         }}
