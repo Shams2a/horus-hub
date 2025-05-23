@@ -132,6 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/mqtt/topics/:topic', adapterController.deleteMqttTopic);
   app.post('/api/mqtt/test', adapterController.testMqttConnection);
   app.post('/api/mqtt/reconnect', adapterController.reconnectMqtt);
+  app.post('/api/adapters/mqtt/stop', adapterManagementController.stopAdapter);
   
   // Log routes
   app.get('/api/logs', logController.getLogs);

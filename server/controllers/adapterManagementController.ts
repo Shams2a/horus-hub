@@ -282,6 +282,40 @@ const updateWifiConfig = async (req: Request, res: Response) => {
   }
 };
 
+// Nouvelle méthode pour arrêter un adaptateur
+const stopAdapter = async (req: Request, res: Response) => {
+  try {
+    const protocol = req.url.includes('mqtt') ? 'mqtt' : req.params.protocol;
+    
+    logger.info(`Stopping ${protocol} adapter`);
+    
+    // Obtenir l'adaptateur réel
+    const adapter = globalAdapterManager?.getAdapter(protocol);
+    if (!adapter) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Adaptateur ${protocol} non trouvé` 
+      });
+    }
+    
+    // Arrêter l'adaptateur réel
+    await adapter.stop();
+    
+    logger.info(`Adapter ${protocol} stopped successfully`);
+    
+    res.json({ 
+      success: true, 
+      message: `Adaptateur ${protocol} arrêté avec succès` 
+    });
+  } catch (error: any) {
+    logger.error('Error stopping adapter', { protocol: req.params.protocol, error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: `Impossible d'arrêter l'adaptateur: ${error.message}` 
+    });
+  }
+};
+
 export default {
   restartAdapter,
   testAdapter,
@@ -289,5 +323,6 @@ export default {
   getAdapterStatus,
   runDiagnostics,
   updateZigbeeConfig,
-  updateWifiConfig
+  updateWifiConfig,
+  stopAdapter
 };

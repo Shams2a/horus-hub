@@ -34,7 +34,8 @@ import {
   Play,
   MessageSquare,
   Settings,
-  Activity
+  Activity,
+  XCircle
 } from 'lucide-react';
 
 export default function Mqtt() {
@@ -222,6 +223,26 @@ export default function Mqtt() {
       title: "Messages effacés",
       description: "L'historique des messages a été vidé"
     });
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await apiRequest('POST', '/api/adapters/mqtt/stop');
+      toast({
+        title: "MQTT déconnecté",
+        description: "Connexion au broker MQTT fermée"
+      });
+      // Actualiser le statut
+      setTimeout(() => {
+        refetchStatus();
+      }, 1000);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de déconnecter le broker MQTT",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleSaveConfig = async () => {
@@ -679,10 +700,10 @@ export default function Mqtt() {
                       <Settings className="h-4 w-4 mr-2" />
                       Sauvegarder la configuration
                     </Button>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <Button onClick={handleTestConnection} variant="outline" className="w-full">
                         <RefreshCw className="h-4 w-4 mr-2" />
-                        Tester la connexion
+                        Tester
                       </Button>
                       <Button 
                         onClick={() => apiRequest('POST', '/api/adapters/mqtt/restart', {})} 
@@ -691,6 +712,14 @@ export default function Mqtt() {
                       >
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Reconnecter
+                      </Button>
+                      <Button 
+                        onClick={handleDisconnect}
+                        variant="destructive" 
+                        className="w-full"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Déconnecter
                       </Button>
                     </div>
                   </div>
