@@ -2,6 +2,8 @@ import { EventEmitter } from 'events';
 import logger from '../utils/logger';
 import { AdapterManager } from './AdapterManager';
 import { storage } from '../storage';
+import * as ZigbeeHerdsman from 'zigbee-herdsman';
+import { SerialPort } from 'serialport';
 
 // Mock for zigbee-herdsman as we can't use the real library in this environment
 class MockZigbeeController extends EventEmitter {
@@ -368,33 +370,43 @@ class ZigbeeAdapter implements ZigbeeAdapter {
 export async function setupZigbeeAdapter(adapterManager: AdapterManager): Promise<ZigbeeAdapter> {
   logger.info('Setting up Zigbee adapter');
   
-  // Get Zigbee settings from storage
-  const zigbeeSettings = await storage.getSetting('zigbee');
-  const settings = zigbeeSettings?.value || {
-    serialPort: '/dev/ttyUSB0',
-    baudRate: 115200,
-    adapterType: 'ember',
-    channel: 15,
-    networkKey: '01 03 05 07 09 0B 0D 0F 11 13 15 17 19 1B 1D 1F'
-  };
-  
-  // Create a Zigbee adapter instance
-  const zigbeeAdapter = new ZigbeeAdapter({
-    serialPort: settings.serialPort,
-    baudRate: settings.baudRate,
-    adapterType: settings.adapterType
-  }, adapterManager);
-  
-  // Register the adapter with the manager
-  adapterManager.registerAdapter('zigbee', zigbeeAdapter);
-  
-  // Start the adapter
+  // Essayer d'abord l'adaptateur réel
   try {
-    await zigbeeAdapter.start();
-  } catch (error) {
-    logger.error('Failed to start Zigbee adapter during setup', { error });
-    // We'll continue even if there's an error, so the user can reconfigure the adapter
+    const { setupRealZigbeeAdapter } = await import('./zigbee-real');
+    const realAdapter = await setupRealZigbeeAdapter(adapterManager);
+    logger.info('Real Zigbee adapter setup successful');
+    return realAdapter as any;
+  } catch (realError) {
+    logger.warn('Failed to setup real Zigbee adapter, falling back to mock', { error: realError.message });
+    
+    // Utiliser l'adaptateur simulé en fallback
+    const zigbeeSettings = await storage.getSetting('zigbee');
+    const settings = zigbeeSettings?.value || {
+      serialPort: '/dev/ttyUSB0',
+      baudRate: 115200,
+      adapterType: 'ember',
+      channel: 15,
+      networkKey: '01 03 05 07 09 0B 0D 0F 11 13 15 17 19 1B 1D 1F'
+    };
+    
+    // Create a Zigbee adapter instance
+    const zigbeeAdapter = new ZigbeeAdapter({
+      serialPort: settings.serialPort,
+      baudRate: settings.baudRate,
+      adapterType: settings.adapterType
+    }, adapterManager);
+    
+    // Register the adapter with the manager
+    adapterManager.registerAdapter('zigbee', zigbeeAdapter);
+    
+    // Start the adapter
+    try {
+      await zigbeeAdapter.start();
+    } catch (error) {
+      logger.error('Failed to start Zigbee adapter during setup', { error });
+      // We'll continue even if there's an error, so the user can reconfigure the adapter
+    }
+    
+    return zigbeeAdapter;
   }
-  
-  return zigbeeAdapter;
 }
