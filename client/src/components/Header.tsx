@@ -45,11 +45,6 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
         </div>
         
         <div className="flex items-center space-x-4">
-          <button className="relative p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-            <Bell className="h-6 w-6" />
-            <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500"></span>
-          </button>
-          
           <span className="hidden md:block text-sm text-gray-600 dark:text-gray-400">Connected to Raspberry Pi</span>
         </div>
       </div>

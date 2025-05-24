@@ -166,28 +166,32 @@ class RealZigbeeController extends EventEmitter implements ZigbeeControllerInter
   }
 
   getDevices(): any[] {
-    if (!this.controller) {
-      return Array.from(this.devices.values());
-    }
-
     try {
+      if (!this.controller) {
+        logger.debug('Zigbee controller not available, returning empty device list');
+        return [];
+      }
+
       const devices = this.controller.getDevices();
+      logger.debug('Retrieved devices from Zigbee controller', { deviceCount: devices.length });
+      
       return devices.map((device: any) => ({
         ieeeAddr: device.ieeeAddr,
         networkAddress: device.networkAddress,
         friendlyName: device.definition?.description || device.ieeeAddr,
         type: device.type,
-        manufacturer: device.definition?.vendor,
-        model: device.definition?.model,
+        manufacturer: device.definition?.vendor || 'Unknown',
+        model: device.definition?.model || 'Unknown Model',
         modelID: device.modelID,
         powerSource: device.powerSource,
         interviewCompleted: device.interviewCompleted,
         interviewing: device.interviewing,
-        lastSeen: device.lastSeen
+        lastSeen: device.lastSeen,
+        rssi: device.linkQuality || -50
       }));
-    } catch (error) {
-      logger.error('Error getting devices', { error });
-      return Array.from(this.devices.values());
+    } catch (error: any) {
+      logger.error('Error getting devices from Zigbee controller', { error: error.message });
+      return [];
     }
   }
 

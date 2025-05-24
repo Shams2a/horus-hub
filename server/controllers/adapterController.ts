@@ -190,6 +190,35 @@ const adapterController = {
   },
   
   /**
+   * Get Zigbee devices
+   */
+  async getZigbeeDevices(req: Request, res: Response): Promise<void> {
+    try {
+      const adapterManager = req.app.locals.adapterManager;
+      if (!adapterManager) {
+        res.status(500).json({ error: 'Adapter manager not available' });
+        return;
+      }
+      
+      const zigbeeAdapter = adapterManager.getAdapter('zigbee');
+      if (!zigbeeAdapter) {
+        res.status(404).json({ error: 'Zigbee adapter not found' });
+        return;
+      }
+      
+      // Récupérer les appareils du vrai adaptateur Zigbee
+      const devices = zigbeeAdapter.getDevices();
+      
+      logger.info('Retrieved Zigbee devices', { deviceCount: devices.length });
+      res.json({ devices });
+      
+    } catch (error: any) {
+      logger.error('Failed to get Zigbee devices', { error: error.message });
+      res.status(500).json({ error: 'Failed to get Zigbee devices', details: error.message });
+    }
+  },
+  
+  /**
    * Set Zigbee permit join
    */
   async setZigbeePermitJoin(req: Request, res: Response): Promise<void> {
