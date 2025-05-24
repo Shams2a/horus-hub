@@ -208,6 +208,41 @@ const runDiagnostics = async (req: Request, res: Response) => {
   }
 };
 
+// Nouvelle méthode pour récupérer la configuration Zigbee
+const getZigbeeConfig = async (req: Request, res: Response) => {
+  try {
+    logger.info('Getting Zigbee configuration');
+    
+    // Obtenir l'adaptateur Zigbee réel
+    const zigbeeAdapter = globalAdapterManager?.getAdapter('zigbee');
+    if (!zigbeeAdapter) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Adaptateur Zigbee non trouvé' 
+      });
+    }
+    
+    // Récupérer la configuration si l'adaptateur le permet
+    let config = {};
+    if (zigbeeAdapter.getConfig) {
+      config = zigbeeAdapter.getConfig();
+    }
+    
+    logger.info('Zigbee configuration retrieved successfully');
+    
+    res.json({ 
+      success: true, 
+      config 
+    });
+  } catch (error: any) {
+    logger.error('Error getting Zigbee configuration', { error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: `Impossible de récupérer la configuration: ${error.message}` 
+    });
+  }
+};
+
 // Nouvelle méthode pour mettre à jour la configuration Zigbee
 const updateZigbeeConfig = async (req: Request, res: Response) => {
   try {
@@ -322,6 +357,7 @@ export default {
   resetAdapter,
   getAdapterStatus,
   runDiagnostics,
+  getZigbeeConfig,
   updateZigbeeConfig,
   updateWifiConfig,
   stopAdapter

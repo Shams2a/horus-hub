@@ -208,6 +208,16 @@ const AdapterManagement = () => {
     }
   });
 
+  // Charger la configuration réellement sauvegardée de Zigbee
+  const { data: savedZigbeeConfig } = useQuery({
+    queryKey: ['/api/zigbee/config'],
+    queryFn: async () => {
+      const response = await fetch('/api/zigbee/config');
+      if (!response.ok) return null;
+      return response.json();
+    }
+  });
+
   // Lancer la détection automatique
   const runDetection = async () => {
     setIsDetecting(true);
@@ -786,13 +796,13 @@ const AdapterManagement = () => {
                           name="serialPort"
                           type="text" 
                           className="w-full p-2 border rounded-md"
-                          defaultValue={detectedZigbeeConfig?.config?.zigbee?.serialPort || "/dev/ttyUSB0"}
+                          defaultValue={savedZigbeeConfig?.config?.serialPort || detectedZigbeeConfig?.config?.zigbee?.serialPort || "/dev/ttyUSB0"}
                           placeholder="/dev/ttyUSB0"
                         />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Débit (Baud Rate)</label>
-                        <select name="baudRate" className="w-full p-2 border rounded-md">
+                        <select name="baudRate" className="w-full p-2 border rounded-md" defaultValue={savedZigbeeConfig?.config?.baudRate || "115200"}>
                           <option value="115200">115200</option>
                           <option value="57600">57600</option>
                           <option value="38400">38400</option>
@@ -804,13 +814,13 @@ const AdapterManagement = () => {
                           name="panId"
                           type="text" 
                           className="w-full p-2 border rounded-md"
-                          defaultValue={zigbeeStatus.panId || "0x1a62"}
+                          defaultValue={savedZigbeeConfig?.config?.panId || zigbeeStatus?.panId || "0x1a62"}
                           placeholder="0x1a62"
                         />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Canal</label>
-                        <select name="channel" className="w-full p-2 border rounded-md">
+                        <select name="channel" className="w-full p-2 border rounded-md" defaultValue={savedZigbeeConfig?.config?.channel || "11"}>
                           <option value="11">Canal 11</option>
                           <option value="15">Canal 15</option>
                           <option value="20">Canal 20</option>
@@ -819,7 +829,7 @@ const AdapterManagement = () => {
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Coordinateur</label>
-                        <select name="coordinator" className="w-full p-2 border rounded-md">
+                        <select name="coordinator" className="w-full p-2 border rounded-md" defaultValue={savedZigbeeConfig?.config?.coordinator || "zStack"}>
                           <option value="zStack">TI Z-Stack</option>
                           <option value="deconz">deCONZ</option>
                           <option value="zigate">ZiGate</option>
@@ -832,13 +842,19 @@ const AdapterManagement = () => {
                           name="networkKey"
                           type="password" 
                           className="w-full p-2 border rounded-md"
+                          defaultValue={savedZigbeeConfig?.config?.networkKey || ""}
                           placeholder="Clé de chiffrement du réseau"
                         />
                       </div>
                     </div>
                     
                     <div className="flex items-center space-x-2">
-                      <input name="permitJoin" type="checkbox" id="zigbee-permit-join" />
+                      <input 
+                        name="permitJoin" 
+                        type="checkbox" 
+                        id="zigbee-permit-join" 
+                        defaultChecked={savedZigbeeConfig?.config?.permitJoin || false}
+                      />
                       <label htmlFor="zigbee-permit-join" className="text-sm">
                         Autoriser l'ajout de nouveaux appareils
                       </label>

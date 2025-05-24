@@ -36,6 +36,15 @@ class MockZigbeeController extends EventEmitter {
     return Promise.resolve();
   }
 
+  getConfig(): any {
+    return this.options;
+  }
+
+  async updateConfig(newConfig: any): Promise<void> {
+    logger.info('Updating Zigbee configuration', { newConfig });
+    this.options = { ...this.options, ...newConfig };
+  }
+
   async permitJoin(permit: boolean, seconds: number = 60): Promise<void> {
     logger.info('Setting permit join', { permit, seconds });
     this.permitJoinEnabled = permit;
