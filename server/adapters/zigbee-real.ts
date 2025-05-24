@@ -19,7 +19,7 @@ interface ZigbeeControllerInterface {
 // Contrôleur Zigbee réel utilisant zigbee-herdsman
 class RealZigbeeController extends EventEmitter implements ZigbeeControllerInterface {
   private controller: any = null;
-  private options: any;
+  public options: any;
   private isStarted: boolean = false;
   private permitJoinEnabled: boolean = false;
   private permitJoinTimeout: NodeJS.Timeout | null = null;
@@ -58,16 +58,22 @@ class RealZigbeeController extends EventEmitter implements ZigbeeControllerInter
       const config = {
         serialPort: {
           path: this.options.serialPort,
-          baudRate: this.options.baudRate,
-          adapter: this.options.adapter
+          baudRate: this.options.baudRate
         },
+        adapter: this.options.adapter,
         network: {
           panID: this.options.panID,
           channel: this.options.channel,
+          channelList: [this.options.channel],
           networkKey: this.options.networkKey
         },
         databasePath: './data/zigbee.db',
-        databaseBackupPath: './data/zigbee_backup.db'
+        databaseBackupPath: './data/zigbee_backup.db',
+        backupPath: './data/zigbee_backup.json',
+        acceptJoiningDeviceHandler: (ieeeAddr: string) => {
+          logger.info('Device joining', { ieeeAddr });
+          return Promise.resolve(true);
+        }
       };
 
       this.controller = new ZigbeeHerdsman.Controller(config);
@@ -371,10 +377,19 @@ export class RealZigbeeAdapter extends EventEmitter {
 
   async updateConfig(newConfig: any): Promise<void> {
     logger.info('Updating real Zigbee configuration', { newConfig });
-    // La mise à jour de configuration nécessite un redémarrage
-    await this.stop();
-    this.controller = new RealZigbeeController({ ...newConfig });
-    await this.start();
+    
+    // Sauvegarder la configuration dans le stockage
+    await storage.insertSetting({
+      key: 'zigbee',
+      value: newConfig,
+      category: 'adapter'
+    });
+    
+    logger.info('Zigbee configuration saved to storage');
+  }
+
+  getConfig(): any {
+    return this.controller.options;
   }
 
   async reset(): Promise<void> {
