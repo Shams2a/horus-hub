@@ -337,23 +337,47 @@ const AdapterManagement = () => {
   });
 
   // Fonction pour appliquer la configuration détectée
-  const applyDetectedConfig = async (protocol: string) => {
+  const applyDetectedConfig = async (protocol: string, adapterData?: any) => {
     try {
       let configData = null;
       
-      if (protocol === 'zigbee' && detectedZigbeeConfig?.found) {
+      // Si on a des données d'adaptateur spécifiques, les utiliser
+      if (adapterData) {
+        configData = {
+          serialPort: adapterData.devicePath || '/dev/ttyUSB0',
+          baudRate: '115200',
+          panId: '0x1a62',
+          channel: '11',
+          coordinator: 'zStack',
+          networkKey: '',
+          permitJoin: true
+        };
+      } else if (protocol === 'zigbee' && detectedZigbeeConfig?.found) {
         configData = detectedZigbeeConfig.config.zigbee;
-        saveZigbeeConfigMutation.mutate(configData);
       } else if (protocol === 'wifi' && detectedWifiConfig?.found) {
         configData = detectedWifiConfig.config.wifi;
-        saveWifiConfigMutation.mutate(configData);
-      } else {
+      }
+      
+      if (!configData) {
         toast({
           title: "Erreur",
           description: "Aucune configuration détectée à appliquer",
           variant: "destructive"
         });
+        return;
       }
+
+      if (protocol === 'zigbee') {
+        saveZigbeeConfigMutation.mutate(configData);
+      } else if (protocol === 'wifi') {
+        saveWifiConfigMutation.mutate(configData);
+      }
+      
+      toast({
+        title: "Configuration appliquée",
+        description: `Configuration ${protocol} copiée depuis la détection automatique`
+      });
+      
     } catch (error) {
       toast({
         title: "Erreur",
@@ -619,7 +643,7 @@ const AdapterManagement = () => {
                                 // Déterminer le protocole basé sur l'adaptateur détecté
                                 const protocol = result.adapter.protocols?.includes('zigbee') ? 'zigbee' : 
                                                result.adapter.protocols?.includes('wifi') ? 'wifi' : 'zigbee';
-                                applyDetectedConfig(protocol);
+                                applyDetectedConfig(protocol, result.adapter);
                               }}
                             >
                               <Save size={14} className="mr-1" />
