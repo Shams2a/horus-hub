@@ -370,16 +370,35 @@ class ZigbeeAdapter implements ZigbeeAdapter {
 export async function setupZigbeeAdapter(adapterManager: AdapterManager): Promise<ZigbeeAdapter> {
   logger.info('Setting up Zigbee adapter');
   
-  // Essayer d'abord l'adaptateur réel
+  // Essayer d'abord l'adaptateur réel seulement si un coordinateur est disponible
+  const zigbeeSettings = await storage.getSetting('zigbee');
+  const settings = zigbeeSettings?.value || {
+    serialPort: '/dev/ttyUSB0',
+    baudRate: 115200,
+    adapterType: 'ember',
+    channel: 15,
+    networkKey: '01 03 05 07 09 0B 0D 0F 11 13 15 17 19 1B 1D 1F'
+  };
+
+  // Vérifier si on peut utiliser l'adaptateur réel
+  let useRealAdapter = false;
   try {
-    const { setupRealZigbeeAdapter } = await import('./zigbee-real');
-    const realAdapter = await setupRealZigbeeAdapter(adapterManager);
-    logger.info('Real Zigbee adapter setup successful');
-    return realAdapter as any;
-  } catch (realError) {
-    logger.warn('Failed to setup real Zigbee adapter, falling back to mock', { error: realError.message });
+    const { SerialPort } = await import('serialport');
+    const ports = await SerialPort.list();
+    useRealAdapter = ports.some(port => port.path === settings.serialPort);
     
-    // Utiliser l'adaptateur simulé en fallback
+    if (useRealAdapter) {
+      logger.info('Serial port found, attempting to use real Zigbee adapter');
+      const { setupRealZigbeeAdapter } = await import('./zigbee-real');
+      const realAdapter = await setupRealZigbeeAdapter(adapterManager);
+      logger.info('Real Zigbee adapter setup successful');
+      return realAdapter as any;
+    }
+  } catch (realError) {
+    logger.warn('Failed to setup real Zigbee adapter, falling back to mock', { error: realError instanceof Error ? realError.message : 'Unknown error' });
+  }
+  
+  // Utiliser l'adaptateur simulé
     const zigbeeSettings = await storage.getSetting('zigbee');
     const settings = zigbeeSettings?.value || {
       serialPort: '/dev/ttyUSB0',
