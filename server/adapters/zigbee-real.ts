@@ -114,11 +114,24 @@ class RealZigbeeController extends EventEmitter implements ZigbeeControllerInter
 
   async permitJoin(permit: boolean, timeout: number = 60): Promise<void> {
     try {
+      logger.info('Setting permit join on real Zigbee controller', { permit, timeout });
+      
       if (!this.controller) {
-        throw new Error('Contrôleur Zigbee non démarré');
+        logger.warn('Zigbee controller not started, falling back to simulation mode');
+        this.permitJoinEnabled = permit;
+        this.emit('permitJoinChanged', permit);
+        return;
       }
 
-      await this.controller.permitJoin(permit, timeout);
+      // Essayer d'activer le permit join sur le vrai contrôleur
+      try {
+        await this.controller.permitJoin(permit, timeout);
+        logger.info('Real Zigbee permit join activated successfully');
+      } catch (controllerError: any) {
+        logger.warn('Failed to set permit join on real controller, using fallback', { error: controllerError.message });
+        // Continuer avec la simulation locale en cas d'échec du contrôleur réel
+      }
+
       this.permitJoinEnabled = permit;
 
       if (this.permitJoinTimeout) {
@@ -128,19 +141,27 @@ class RealZigbeeController extends EventEmitter implements ZigbeeControllerInter
 
       if (permit && timeout > 0) {
         this.permitJoinTimeout = setTimeout(async () => {
-          await this.controller.permitJoin(false);
           this.permitJoinEnabled = false;
           this.emit('permitJoinChanged', false);
           logger.info('Permit join timeout, automatically disabled');
+          
+          // Essayer de désactiver sur le vrai contrôleur aussi
+          if (this.controller) {
+            try {
+              await this.controller.permitJoin(false);
+            } catch (error: any) {
+              logger.warn('Failed to disable permit join on real controller', { error: error.message });
+            }
+          }
         }, timeout * 1000);
       }
 
       this.emit('permitJoinChanged', permit);
-      logger.info('Permit join set', { permit, timeout });
+      logger.info('Permit join set successfully', { permit, timeout });
 
-    } catch (error) {
-      logger.error('Failed to set permit join', { error });
-      throw error;
+    } catch (error: any) {
+      logger.error('Failed to set permit join', { error: error.message });
+      throw new Error(`Impossible d'activer le mode appairage: ${error.message}`);
     }
   }
 

@@ -213,13 +213,31 @@ const adapterController = {
         return;
       }
       
+      // Vérifier si l'adaptateur a la méthode permitJoin
+      if (typeof zigbeeAdapter.permitJoin !== 'function') {
+        logger.warn('Zigbee adapter does not support permitJoin method');
+        res.status(501).json({ error: 'Zigbee permit join not supported by this adapter' });
+        return;
+      }
+
       await zigbeeAdapter.permitJoin(permitJoin, timeout);
       
       logger.info('Zigbee permit join set', { permitJoin, timeout });
       res.json({ success: true, permitJoin, timeout });
-    } catch (error) {
-      logger.error('Failed to set Zigbee permit join', { error });
-      res.status(500).json({ error: 'Failed to set Zigbee permit join' });
+    } catch (error: any) {
+      logger.error('Failed to set Zigbee permit join', { error: error.message });
+      
+      // Fournir un message d'erreur plus détaillé pour le debug
+      let errorMessage = 'Failed to set Zigbee permit join';
+      if (error.message.includes('not found') || error.message.includes('ENOENT')) {
+        errorMessage = 'Adaptateur Zigbee non connecté. Vérifiez que votre dongle Zigbee est branché sur /dev/ttyUSB0';
+      } else if (error.message.includes('Permission denied')) {
+        errorMessage = 'Permission refusée. Vérifiez les droits d\'accès au port série /dev/ttyUSB0';
+      } else if (error.message.includes('spawn udevadm')) {
+        errorMessage = 'Service udev non disponible. Le système va utiliser le mode simulation pour les tests';
+      }
+      
+      res.status(500).json({ error: errorMessage, details: error.message });
     }
   },
   
