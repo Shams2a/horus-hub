@@ -114,7 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Zigbee specific routes
   app.get('/api/zigbee/status', adapterController.getZigbeeStatus);
-  app.get('/api/zigbee/config', adapterManagementController.getZigbeeConfig);
+  app.get('/api/adapters/zigbee/config', adapterManagementController.getZigbeeConfig);
   app.put('/api/zigbee/config', adapterManagementController.updateZigbeeConfig);
   app.post('/api/zigbee/permit-join', adapterController.setZigbeePermitJoin);
   app.post('/api/zigbee/map', adapterController.generateZigbeeMap);
