@@ -611,6 +611,21 @@ const AdapterManagement = () => {
                             </Badge>
                             {result.adapter && <span className="font-semibold">{result.adapter.name}</span>}
                           </div>
+                          {result.adapter && result.confidence === 'high' && (
+                            <Button 
+                              size="sm" 
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => {
+                                // Déterminer le protocole basé sur l'adaptateur détecté
+                                const protocol = result.adapter.protocols?.includes('zigbee') ? 'zigbee' : 
+                                               result.adapter.protocols?.includes('wifi') ? 'wifi' : 'zigbee';
+                                applyDetectedConfig(protocol);
+                              }}
+                            >
+                              <Save size={14} className="mr-1" />
+                              Appliquer Config
+                            </Button>
+                          )}
                         </div>
                         
                         {result.adapter && (
