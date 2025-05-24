@@ -14,7 +14,17 @@ class MockZigbeeController extends EventEmitter {
   constructor(options: any) {
     super();
     this.devices = new Map();
-    this.options = options;
+    // Initialiser avec les options par défaut si non fournies
+    this.options = {
+      serialPort: '/dev/ttyUSB0',
+      baudRate: '115200',
+      panId: '0x1a62',
+      channel: '11',
+      coordinator: 'zStack',
+      networkKey: '',
+      permitJoin: false,
+      ...options // Appliquer les options passées en paramètre
+    };
     
     // Devices will be populated when real Zigbee devices are discovered
     
@@ -324,6 +334,16 @@ class ZigbeeAdapter implements ZigbeeAdapter {
     };
     
     return status;
+  }
+
+  // Method to get current configuration
+  getConfig(): any {
+    return this.controller.getConfig();
+  }
+
+  // Method to update configuration
+  async updateConfig(newConfig: any): Promise<void> {
+    return this.controller.updateConfig(newConfig);
   }
   
   // Method to control a device (e.g., turn on/off a light)
