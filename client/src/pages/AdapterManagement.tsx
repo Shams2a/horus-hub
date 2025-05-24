@@ -312,8 +312,9 @@ const AdapterManagement = () => {
         title: "Configuration sauvegardée",
         description: "Configuration Zigbee mise à jour avec succès"
       });
-      // Actualiser le statut
+      // Actualiser le statut ET la configuration
       queryClient.invalidateQueries({ queryKey: ['/api/zigbee/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/zigbee/config'] });
     },
     onError: () => {
       toast({
