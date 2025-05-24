@@ -67,8 +67,8 @@ export default function AddDeviceModal({ isOpen, onClose }: AddDeviceModalProps)
       progress += (100 / scanDuration);
       setScanProgress(progress);
 
-      // Récupérer les vrais appareils Zigbee découverts
-      if (progress > 20 && Math.random() < 0.15) {
+      // Récupérer les vrais appareils Zigbee découverts plus fréquemment
+      if (progress > 10) {
         fetchZigbeeDevices();
       }
 
@@ -84,23 +84,44 @@ export default function AddDeviceModal({ isOpen, onClose }: AddDeviceModalProps)
     }, 1000);
   };
 
-  // Récupérer les appareils Zigbee réels
+  // Récupérer les nouveaux appareils Zigbee découverts
   const fetchZigbeeDevices = async () => {
     try {
       const response = await fetch('/api/zigbee/devices');
       if (response.ok) {
         const data = await response.json();
-        if (data.devices) {
-          const devices = data.devices.map((device: any) => ({
-            id: device.ieeeAddr || device.id,
-            name: device.friendlyName || device.name || `Appareil ${device.id}`,
-            type: device.type || 'unknown',
-            rssi: device.rssi || -50,
-            manufacturer: device.manufacturer,
-            model: device.model,
-            status: 'discovered' as const
-          }));
-          setScannedDevices(devices);
+        console.log('Données Zigbee reçues:', data);
+        
+        if (data.devices && Array.isArray(data.devices)) {
+          // Filtrer seulement les nouveaux appareils (non encore ajoutés)
+          const existingDevicesResponse = await fetch('/api/devices');
+          const existingDevicesData = await existingDevicesResponse.json();
+          const existingIds = existingDevicesData.map((d: any) => d.deviceId);
+          
+          const newDevices = data.devices
+            .filter((device: any) => !existingIds.includes(device.ieeeAddr || device.id))
+            .map((device: any) => ({
+              id: device.ieeeAddr || device.id,
+              name: device.friendlyName || device.name || `Appareil ${device.id || 'inconnu'}`,
+              type: device.type || 'unknown',
+              rssi: device.rssi || device.linkquality || -50,
+              manufacturer: device.manufacturer || 'Inconnu',
+              model: device.model || device.modelID || 'Non spécifié',
+              status: 'discovered' as const
+            }));
+          
+          if (newDevices.length > 0) {
+            setScannedDevices(prev => {
+              const existingDeviceIds = prev.map(d => d.id);
+              const filteredNewDevices = newDevices.filter(d => !existingDeviceIds.includes(d.id));
+              return [...prev, ...filteredNewDevices];
+            });
+            
+            toast({
+              title: "Nouveaux appareils détectés !",
+              description: `${newDevices.length} appareil(s) découvert(s)`,
+            });
+          }
         }
       }
     } catch (error) {

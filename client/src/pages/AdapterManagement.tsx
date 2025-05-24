@@ -853,17 +853,7 @@ const AdapterManagement = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-2">
-                      <input 
-                        name="permitJoin" 
-                        type="checkbox" 
-                        id="zigbee-permit-join" 
-                        defaultChecked={currentZigbeeConfig.permitJoin || false}
-                      />
-                      <label htmlFor="zigbee-permit-join" className="text-sm">
-                        Autoriser l'ajout de nouveaux appareils
-                      </label>
-                    </div>
+
                     
                     <div className="flex space-x-3">
                       <Button 
