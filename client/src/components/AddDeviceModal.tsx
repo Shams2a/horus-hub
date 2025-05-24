@@ -36,7 +36,7 @@ export default function AddDeviceModal({ isOpen, onClose }: AddDeviceModalProps)
     try {
       setScanningStep('enabling');
       await apiRequest('POST', '/api/zigbee/permit-join', { 
-        permit: true, 
+        permitJoin: true, 
         seconds: scanDuration 
       });
       setPermitJoinEnabled(true);
@@ -79,7 +79,7 @@ export default function AddDeviceModal({ isOpen, onClose }: AddDeviceModalProps)
         setPermitJoinEnabled(false);
         
         // Désactiver le permit join
-        apiRequest('POST', '/api/zigbee/permit-join', { permit: false });
+        apiRequest('POST', '/api/zigbee/permit-join', { permitJoin: false });
       }
     }, 1000);
   };
