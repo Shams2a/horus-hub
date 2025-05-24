@@ -208,14 +208,15 @@ const AdapterManagement = () => {
     }
   });
 
-  // Charger la configuration réellement sauvegardée de Zigbee
-  const { data: savedZigbeeConfig } = useQuery({
-    queryKey: ['/api/zigbee/config'],
-    queryFn: async () => {
-      const response = await fetch('/api/zigbee/config');
-      if (!response.ok) return null;
-      return response.json();
-    }
+  // État local pour la configuration sauvegardée
+  const [currentZigbeeConfig, setCurrentZigbeeConfig] = useState({
+    serialPort: '/dev/ttyUSB0',
+    baudRate: '115200',
+    panId: '0x1a62', 
+    channel: '11',
+    coordinator: 'zStack',
+    networkKey: '',
+    permitJoin: false
   });
 
   // Lancer la détection automatique
@@ -314,7 +315,7 @@ const AdapterManagement = () => {
       });
       // Actualiser le statut ET la configuration
       queryClient.invalidateQueries({ queryKey: ['/api/zigbee/status'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/zigbee/config'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/zigbee-config'] });
     },
     onError: () => {
       toast({
